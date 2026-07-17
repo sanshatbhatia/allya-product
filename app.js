@@ -318,9 +318,53 @@ function sendText(text) {
 const input = document.getElementById('composerInput');
 const sendBtn = document.getElementById('sendBtn');
 pressable(sendBtn, 0.9);
-function submitComposer() { if (!input.value.trim()) return; sendText(input.value); input.value = ''; }
+function submitComposer() { if (!input.value.trim()) return; sendText(input.value); input.value = ''; hideSuggest(); }
 sendBtn.addEventListener('click', submitComposer);
-input.addEventListener('keydown', e => { if (e.key === 'Enter') submitComposer(); });
+input.addEventListener('keydown', e => {
+  if (e.key === 'Enter') submitComposer();
+  if (e.key === 'Escape') hideSuggest();
+});
+
+/* ---- the composer pops when you engage it ---- */
+const composerEl = document.querySelector('.composer');
+const fieldEl = composerEl.querySelector('.field');
+const suggest = document.getElementById('suggest');
+
+const fieldPop = new Spring(0, { response: 0.32, damping: 0.72, onframe: (p, v, settled) => {
+  fieldEl.style.transform = `translateY(${-2.5 * p}px) scale(${1 + 0.012 * p})`;
+  if (settled && p === 0) fieldEl.style.transform = '';
+}});
+const suggestPop = new Spring(0, { response: 0.34, damping: 0.78, onframe: (p, v, settled) => {
+  suggest.style.opacity = clamp(p, 0, 1);
+  suggest.style.transform = `translateY(${9 * (1 - p)}px) scale(${0.96 + 0.04 * Math.min(p, 1.2)})`;
+  if (settled && p <= 0.01) suggest.hidden = true;
+}});
+
+function showSuggest() {
+  if (!suggest.hidden && suggestPop.target === 1) return;
+  if (suggest.hidden) {
+    // pre-paint the start pose so unhiding never flashes at full opacity
+    suggest.style.opacity = 0;
+    suggest.style.transform = 'translateY(9px) scale(0.96)';
+    suggest.hidden = false;
+  }
+  fieldPop.to(1, 6);         // pop with a little arrival momentum
+  suggestPop.to(1, 5);
+}
+function hideSuggest() {
+  fieldPop.set(0.3, 1).to(0);
+  suggestPop.set(0.3, 1).to(0);
+}
+
+input.addEventListener('focus', showSuggest);
+composerEl.addEventListener('focusout', (e) => {
+  if (composerEl.contains(e.relatedTarget)) return;   // moving within the composer
+  hideSuggest();
+});
+suggest.querySelectorAll('.suggest-item').forEach(b => {
+  b.addEventListener('mousedown', (e) => e.preventDefault());   // keep the input focused
+  b.addEventListener('click', () => { hideSuggest(); sendText(b.dataset.say); });
+});
 
 /* opening beats — a tool opens already working */
 function seedChat() {

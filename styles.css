@@ -205,12 +205,44 @@ button { font-family: inherit; color: inherit; }
 /* composer — part of the chat pane, not floating over it */
 .composer {
   flex: none;
+  position: relative;
   padding: 10px 24px 16px;
   border-top: 1px solid var(--hairline);
   background: rgba(10,10,10,0.72);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
+
+/* pops up from the field when it gains focus (anchored to its source) */
+.suggest {
+  position: absolute;
+  left: 24px; right: 24px;
+  bottom: calc(100% + 2px);
+  background: var(--card);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 13px;
+  padding: 10px 8px 8px;
+  transform-origin: bottom center;
+  will-change: transform, opacity;
+  box-shadow: 0 -12px 40px -18px rgba(0,0,0,0.8);
+  z-index: 5;
+}
+.suggest-label {
+  font-size: 11px; font-weight: 500;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--fg-faint);
+  padding: 0 10px 7px;
+}
+.suggest-item {
+  display: block; width: 100%; text-align: left;
+  appearance: none; background: none; border: none; cursor: pointer;
+  font-family: var(--serif); font-optical-sizing: auto; font-weight: 420;
+  font-size: 14.5px; color: var(--fg);
+  border-radius: 8px;
+  padding: 9px 10px;
+  transition: background var(--dur) var(--ease);
+}
+.suggest-item:hover { background: var(--raised); color: var(--lime-glow); }
 .composer .field {
   display: flex; align-items: center; gap: 10px;
   background: var(--surface);
