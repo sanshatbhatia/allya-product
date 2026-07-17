@@ -174,10 +174,16 @@ function renderWork() {
 function syncStatus() {
   const running = WORK.filter(w => w.status === 'running').length;
   const needs = WORK.filter(w => w.status === 'needs-you').length;
+  const shippedN = WORK.filter(w => w.status === 'shipped').length;
   document.getElementById('statusText').textContent =
     `${running} agent${running === 1 ? '' : 's'} running` + (needs ? ` · ${needs} needs you` : '');
   const badge = document.getElementById('tabBadge');
   badge.textContent = needs ? `·${needs}` : '';
+  // home canvas mirrors the same truth
+  document.getElementById('statShipped').textContent = shippedN;
+  document.getElementById('statRunning').textContent = running;
+  document.getElementById('statNeeds').textContent = needs;
+  document.getElementById('statNeeds').parentElement.classList.toggle('lime', needs > 0);
 }
 
 /* move an item to shipped with a small spring entrance on its new row */
@@ -322,8 +328,47 @@ function submitComposer() { if (!input.value.trim()) return; sendText(input.valu
 sendBtn.addEventListener('click', submitComposer);
 input.addEventListener('keydown', e => {
   if (e.key === 'Enter') submitComposer();
-  if (e.key === 'Escape') hideSuggest();
+  if (e.key === 'Escape') {
+    // first Escape closes the popup; a second (with an empty field) steps
+    // back to the quiet canvas
+    if (!suggest.hidden && suggestPop.target === 1) hideSuggest();
+    else if (!input.value.trim()) disengageChat();
+  }
 });
+
+/* ---- the canvas ↔ chat handover: messages stay out of sight
+   until you actually engage the bar ---- */
+const paneChat = document.getElementById('paneChat');
+const canvas = document.getElementById('canvas');
+let chatEngaged = false;
+
+/* State flips immediately; springs are presentation only, so an
+   interrupted (or throttled) animation can never strand the UI. */
+function riseIn(el) {
+  if (reduceMotion) return;
+  el.style.opacity = 0;
+  new Spring(0, { response: 0.4, damping: 0.9, onframe: (q, w, done) => {
+    el.style.opacity = q;
+    el.style.transform = `translateY(${14 * (1 - q)}px)`;
+    if (done) { el.style.opacity = ''; el.style.transform = ''; }
+  }}).to(1);
+}
+
+function engageChat() {
+  if (chatEngaged) return;
+  chatEngaged = true;
+  paneChat.classList.add('engaged');
+  riseIn(threadScroll);
+  scrollThread();
+}
+
+function disengageChat() {
+  if (!chatEngaged) return;
+  chatEngaged = false;
+  input.blur();
+  paneChat.classList.remove('engaged');
+  riseIn(canvas);
+}
 
 /* ---- the composer pops when you engage it ---- */
 const composerEl = document.querySelector('.composer');
@@ -356,7 +401,7 @@ function hideSuggest() {
   suggestPop.set(0.3, 1).to(0);
 }
 
-input.addEventListener('focus', showSuggest);
+input.addEventListener('focus', () => { engageChat(); showSuggest(); });
 composerEl.addEventListener('focusout', (e) => {
   if (composerEl.contains(e.relatedTarget)) return;   // moving within the composer
   hideSuggest();
