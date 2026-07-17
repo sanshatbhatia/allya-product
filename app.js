@@ -100,14 +100,14 @@ function escapeHtml(s) { const d = document.createElement('div'); d.textContent 
    ============================================================ */
 const WORK = [
   { id: 'newsletter', status: 'needs-you', origin: 'expert',
-    who: 'A', whoName: 'Allya', whoRole: 'with Priya, your PR expert',
-    say: 'Next week’s newsletter is drafted around the SurferSearcher result. Priya’s edits are in. Read it before it ships?' },
+    who: 'A', whoName: 'Allya', whoRole: 'with your PR expert',
+    say: 'Next week’s newsletter is drafted around the SurferSearcher result. Your PR expert’s edits are in. Read it before it ships?' },
   { id: 'leads', status: 'running', origin: 'agent',
     title: 'Enriching 40 leads from last week’s signups', meta: 'agent · ~8 min left' },
   { id: 'screening', status: 'running', origin: 'agent',
     title: 'Screening 6 candidates for the ops role', meta: 'agent · ranking against your approved JD' },
   { id: 'press', status: 'running', origin: 'expert',
-    title: 'Press list — 22 journalists, matched to your space', meta: 'with Priya · final pass' },
+    title: 'Press list — 22 journalists, matched to your space', meta: 'expert · final pass' },
   { id: 'crm', status: 'shipped', origin: 'agent',
     title: 'CRM cleanup — 41 stale leads merged, 12 archived', meta: '6:40am · sales expert spot-checked' },
   { id: 'jd', status: 'shipped', origin: 'agent',
@@ -158,7 +158,8 @@ function renderWork() {
     html += `
     <div class="work-row shipped" data-work-id="${w.id}">
       <span class="tick">${TICK_SVG}</span>
-      <div class="w-copy"><div class="t">${w.title}</div><div class="s">${w.meta}</div></div>
+      <div class="w-copy"><div class="t">${w.title}</div>
+        <div class="s">${w.meta}${w.undoable ? ' · <button class="row-undo" data-undo="' + w.id + '">undo</button>' : ''}</div></div>
       <span class="pill">${w.origin === 'expert' ? 'expert' : 'agent'}</span>
     </div>`;
   });
@@ -180,10 +181,11 @@ function syncStatus() {
 }
 
 /* move an item to shipped with a small spring entrance on its new row */
-function shipItem(id, newTitle, newMeta) {
+function shipItem(id, newTitle, newMeta, undoable) {
   const w = WORK.find(x => x.id === id);
   if (!w) return;
   w.status = 'shipped';
+  w.undoable = !!undoable;
   if (newTitle) w.title = newTitle;
   if (newMeta) w.meta = newMeta;
   // shipped list shows newest first
@@ -258,7 +260,7 @@ const SCRIPT = {
     typing(() => {
       addMsg('allya', `Good one to get ahead of. I'll draft next week's around the SurferSearcher result — 13 campaigns in month one reads better than anything I could invent.`);
       typing(() => {
-        addMsg('allya', `I broke it into three: subject lines, the body, and a P.S. that asks for one reply. Two of Priya's edits are already in. It's waiting in your work panel.`);
+        addMsg('allya', `I broke it into three: subject lines, the body, and a P.S. that asks for one reply. Your PR expert already tightened two lines. It's waiting in your work panel.`);
         showChips([
           { label: 'Show me the draft', act: () => openSheet('newsletter') },
           { label: 'Change the angle', act: () => quickSay('Change the angle') },
@@ -270,7 +272,7 @@ const SCRIPT = {
     typing(() => {
       addMsg('allya', `You have 6 people through the first screen for the ops role. I ranked them against the JD you approved, not against a résumé template.`);
       typing(() => {
-        addMsg('human', `I sat in on the top two — both worth 20 minutes of your time. I've held Thursday 3pm and 4pm.`, { tag: `Priya <span class="human-tag">· your hiring expert</span>` });
+        addMsg('human', `I sat in on the top two — both worth 20 minutes of your time. I've held Thursday 3pm and 4pm.`, { tag: `<span class="human-tag">Your hiring expert</span>` });
         showChips([
           { label: 'Book both', act: () => quickSay('Book both') },
           { label: 'See the ranking', act: () => openSheet('hiring') },
@@ -454,25 +456,40 @@ function fillSheet(context) {
     head.innerHTML = `
       <div class="avatar">A</div>
       <div>
-        <div class="who">Allya <span class="role">· with Priya, your PR expert</span></div>
+        <div class="who">Allya <span class="role">· with your PR expert</span></div>
         <div class="line">Next week’s newsletter. Read it, then approve — nothing sends until you do.</div>
       </div>`;
     body.innerHTML = `
+      ${trail([
+        { kind: 'agent', txt: 'Drafted by agent', time: '6:12am' },
+        { kind: 'expert', txt: 'Your PR expert edited 2 lines', time: '6:58am', toggle: true },
+        { kind: 'you', txt: 'Waiting on you — nothing ships without this step' },
+      ], `
+        <div class="d-pair"><div class="d-old">We ran 13 marketing campaigns for SurferSearcher last month</div>
+        <div class="d-new">The agency did 13 campaigns. In one month.</div></div>
+        <div class="d-pair"><div class="d-old">Our AI-powered platform can streamline your marketing</div>
+        <div class="d-new">You didn’t start a company to write newsletters at 11pm.</div></div>`)}
       ${draft('Subject line', 'The agency did 13 campaigns. In one month.',
         'Leads with the SurferSearcher number. No adjectives — the figure carries it.', ['open rate angle', 'A/B ready'])}
       ${draft('Body', 'You didn’t start a company to write newsletters at 11pm.',
-        'Three short paragraphs. One idea each. Ends on your actual offer, not a pitch.', ['your voice', 'Priya edited'])}
+        'Three short paragraphs. One idea each. Ends on your actual offer, not a pitch.', ['your voice', 'expert edited'])}
       ${draft('P.S.', 'Reply with one word — the thing eating your week. I’ll take it from there.',
-        'Asks for a single reply so you can start real conversations, not track opens.', ['1 reply goal'])}`;
+        'Asks for a single reply so you can start real conversations, not track opens.', ['1 reply goal'])}
+      <p class="undo-note">After you approve, it holds for 10 minutes before actually sending — you can pull it back.</p>`;
     document.getElementById('approveLabel').textContent = 'Approve — schedule it';
   } else {
     head.innerHTML = `
-      <div class="avatar human">P</div>
+      <div class="avatar human">${PERSON_SVG}</div>
       <div>
-        <div class="who">Priya <span class="role">· your hiring expert</span></div>
+        <div class="who">Your hiring expert</div>
         <div class="line">Six through the first screen. Here are the two I’d spend your time on.</div>
       </div>`;
     body.innerHTML = `
+      ${trail([
+        { kind: 'agent', txt: 'Agent screened 6 candidates overnight', time: '5:30am' },
+        { kind: 'expert', txt: 'Your hiring expert sat in on the top two', time: '8:15am' },
+        { kind: 'you', txt: 'Waiting on you — your call, always' },
+      ])}
       ${draft('#1 — Ananya R.', 'Ran ops solo at a seed-stage fintech for 2 years.',
         'Did the messy version of this job with no team. Strong on the parts you hate.', ['ops', 'seed-stage', 'available in 2 wks'])}
       ${draft('#2 — Karan M.', 'Built the hiring pipeline at a 4-person startup.',
@@ -490,6 +507,32 @@ function draft(kicker, title, body, tags) {
   </div>`;
 }
 
+const PERSON_SVG = '<svg viewBox="0 0 24 24" width="11" height="11" fill="none"><path d="M12 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm-6.5 8.5a6.5 6.5 0 0 1 13 0" stroke="#e7c98a" stroke-width="2" stroke-linecap="round"/></svg>';
+
+/* provenance trail — who touched this, in order */
+function trail(rows, diffHtml) {
+  return `<div class="trail">
+    ${rows.map(r => `
+      <div class="trail-row ${r.kind === 'you' ? 'now' : ''}">
+        <span class="t-dot ${r.kind}">${r.kind === 'expert' ? PERSON_SVG : ''}</span>
+        <span class="t-txt">${r.txt}</span>
+        ${r.toggle ? '<button class="trail-toggle">see the edits</button>' : ''}
+        ${r.time ? `<span class="t-time">${r.time}</span>` : ''}
+      </div>`).join('')}
+    ${diffHtml ? `<div class="trail-diff" hidden>${diffHtml}</div>` : ''}
+  </div>`;
+}
+
+/* expand/collapse the expert's actual edits */
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('.trail-toggle');
+  if (!t) return;
+  const diff = t.closest('.trail').querySelector('.trail-diff');
+  if (!diff) return;
+  diff.hidden = !diff.hidden;
+  t.textContent = diff.hidden ? 'see the edits' : 'hide the edits';
+});
+
 /* approve → commit cue + item moves to Shipped + chat beat */
 const shipped = document.getElementById('shipped');
 document.getElementById('approveBtn').addEventListener('click', () => {
@@ -498,10 +541,10 @@ document.getElementById('approveBtn').addEventListener('click', () => {
   closeSheet(700);
   setTimeout(() => {
     if (ctx === 'newsletter') {
-      shipItem('newsletter', 'Newsletter approved — goes out Tuesday 9am', 'just now · you approved');
-      toast('Scheduled. It goes out Tuesday 9am.');
+      shipItem('newsletter', 'Newsletter approved — goes out Tuesday 9am', 'holds 10 min before sending', true);
+      toast('Scheduled. You have 10 minutes to pull it back.');
       addMsg('you', 'Approved');
-      typing(() => addMsg('allya', `Scheduled for Tuesday 9am. I’ll watch the replies and pull anything worth your time into here.`), 700);
+      typing(() => addMsg('allya', `Scheduled for Tuesday 9am. It holds for 10 minutes in case you change your mind — after that I’ll watch the replies and pull anything worth your time into here.`), 700);
     } else {
       toast('Booked. Thursday 3 & 4pm are on your calendar.');
       addMsg('you', 'Book both');
@@ -548,9 +591,133 @@ document.querySelectorAll('.tab').forEach(t => {
 
 /* open-sheet delegation (work panel re-renders, so delegate) */
 document.addEventListener('click', (e) => {
+  const undo = e.target.closest('[data-undo]');
+  if (undo) {
+    e.stopPropagation();
+    unshipItem(undo.dataset.undo);
+    return;
+  }
   const el = e.target.closest('[data-open-sheet]');
   if (el) { e.stopPropagation(); openSheet(el.dataset.openSheet); }
 });
+
+/* pull an approved item back inside its undo window */
+function unshipItem(id) {
+  const w = WORK.find(x => x.id === id);
+  if (!w) return;
+  w.status = 'needs-you';
+  w.undoable = false;
+  if (id === 'newsletter') {
+    w.title = undefined;
+    w.say = 'Held it — the newsletter is back in your queue, unsent. Take another look whenever.';
+  }
+  WORK.splice(WORK.indexOf(w), 1);
+  WORK.unshift(w);
+  renderWork();
+  haptic([10]);
+  toast('Held. Nothing sent.');
+  addMsg('you', 'Undo that');
+  typing(() => addMsg('allya', `Pulled it back — nothing went out. It's in your queue again; no harm done.`), 600);
+}
+
+/* ============================================================
+   The brain — Allya thinking, ambiently.
+   Drifting thought-nodes, faint connections, and synapse pulses
+   that fire along them. Deliberately quiet: it should read as a
+   presence you sense, not a screensaver you watch.
+   ============================================================ */
+(function brain() {
+  const canvas = document.getElementById('brain');
+  if (!canvas || reduceMotion) { if (canvas) canvas.remove(); return; }
+  const ctx2 = canvas.getContext('2d');
+  let W = 0, H = 0, dpr = 1, nodes = [], pulses = [];
+  const LINK = 150;
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    ctx2.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const n = clamp(Math.round((W * H) / 26000), 24, 54);
+    while (nodes.length < n) nodes.push(mkNode());
+    nodes.length = n;
+  }
+  function mkNode() {
+    return {
+      x: Math.random() * W, y: Math.random() * H,
+      vx: (Math.random() - 0.5) * 12, vy: (Math.random() - 0.5) * 12,
+      r: 1 + Math.random() * 1.4,
+    };
+  }
+  function firePulse() {
+    // pick a random close pair and send a spark along the line
+    for (let tries = 0; tries < 12; tries++) {
+      const a = nodes[(Math.random() * nodes.length) | 0];
+      const b = nodes[(Math.random() * nodes.length) | 0];
+      if (a === b) continue;
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (d < LINK) { pulses.push({ a, b, t: 0, dur: 0.55 + Math.random() * 0.5 }); return; }
+    }
+  }
+
+  let last = performance.now(), pulseClock = 0;
+  function frame(now) {
+    let dt = (now - last) / 1000; last = now;
+    if (dt > 0.05) dt = 0.05;
+    ctx2.clearRect(0, 0, W, H);
+
+    for (const p of nodes) {
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      if (p.x < -20) p.x = W + 20; if (p.x > W + 20) p.x = -20;
+      if (p.y < -20) p.y = H + 20; if (p.y > H + 20) p.y = -20;
+    }
+
+    // connections
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i], b = nodes[j];
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        if (d < LINK) {
+          const alpha = 0.055 * (1 - d / LINK);
+          ctx2.strokeStyle = `rgba(145, 212, 95, ${alpha})`;
+          ctx2.lineWidth = 1;
+          ctx2.beginPath(); ctx2.moveTo(a.x, a.y); ctx2.lineTo(b.x, b.y); ctx2.stroke();
+        }
+      }
+    }
+    // nodes
+    for (const p of nodes) {
+      ctx2.fillStyle = 'rgba(145, 212, 95, 0.14)';
+      ctx2.beginPath(); ctx2.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx2.fill();
+    }
+    // synapse pulses — a bright thought travelling a connection
+    pulseClock += dt;
+    if (pulseClock > 0.9) { pulseClock = 0; if (Math.random() < 0.8) firePulse(); }
+    pulses = pulses.filter(s => (s.t += dt / s.dur) < 1);
+    for (const s of pulses) {
+      const x = s.a.x + (s.b.x - s.a.x) * s.t;
+      const y = s.a.y + (s.b.y - s.a.y) * s.t;
+      const fade = Math.sin(s.t * Math.PI);
+      ctx2.fillStyle = `rgba(180, 232, 138, ${0.5 * fade})`;
+      ctx2.beginPath(); ctx2.arc(x, y, 1.8, 0, Math.PI * 2); ctx2.fill();
+      ctx2.strokeStyle = `rgba(145, 212, 95, ${0.16 * fade})`;
+      ctx2.lineWidth = 1;
+      ctx2.beginPath(); ctx2.moveTo(s.a.x, s.a.y); ctx2.lineTo(x, y); ctx2.stroke();
+    }
+  }
+  let running = false;
+  function start() { if (running) return; running = true; last = performance.now(); requestAnimationFrame(loop); }
+  function stop() { running = false; }
+  function loop(now) { if (!running) return; frame(now); requestAnimationFrame(loop); }
+
+  window.addEventListener('resize', resize);
+  document.addEventListener('visibilitychange', () => (document.hidden ? stop() : start()));
+  resize();
+  start();
+  // dev handle: lets tooling pause the rAF loop (screenshot capture needs idle frames)
+  window.__brain = { start, stop };
+})();
 
 /* boot */
 renderWork();

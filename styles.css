@@ -71,7 +71,14 @@ button { font-family: inherit; color: inherit; }
 /* ============================================================
    Shell: topbar over a two-pane split
    ============================================================ */
+/* the brain — Allya's ambient presence, behind everything */
+#brain {
+  position: fixed; inset: 0; z-index: 0;
+  pointer-events: none;
+}
+
 #app {
+  position: relative; z-index: 1;
   height: 100dvh;
   display: flex; flex-direction: column;
 }
@@ -401,6 +408,62 @@ button { font-family: inherit; color: inherit; }
   background: var(--lime-dim); border-radius: 999px; padding: 3px 9px;
 }
 .sheet-note { font-family: var(--serif); font-size: 13.5px; color: var(--fg-soft); margin: 14px 0 0; line-height: 1.55; }
+.undo-note { font-size: 12px; color: var(--fg-faint); margin: 12px 2px 0; line-height: 1.5; }
+
+/* ---- provenance trail: who touched this, in order ---- */
+.trail {
+  border: 1px solid var(--hairline);
+  border-radius: 11px;
+  padding: 4px 14px;
+  margin-bottom: 12px;
+  background: rgba(255,255,255,0.015);
+}
+.trail-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 12.5px; color: var(--fg-soft);
+}
+.trail .trail-row:last-of-type { border-bottom: none; }
+.trail-row.now { color: var(--fg); }
+.t-dot {
+  flex: none; width: 20px; height: 20px; border-radius: 50%;
+  display: grid; place-items: center;
+}
+.t-dot.agent { background: var(--raised); border: 1px solid var(--hairline-strong); }
+.t-dot.agent::after { content: ""; width: 6px; height: 6px; border-radius: 2px; background: var(--fg-soft); }
+.t-dot.expert { background: var(--human-bg); border: 1px solid var(--human-border); }
+.t-dot.you { background: var(--lime-dim); border: 1px solid var(--lime); }
+.t-dot.you::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--lime); }
+.t-txt { flex: 1; min-width: 0; }
+.t-time { flex: none; font-size: 11px; color: var(--fg-faint); font-variant-numeric: tabular-nums; }
+.trail-toggle {
+  appearance: none; background: none; border: none; cursor: pointer;
+  font-size: 11.5px; font-weight: 500; color: var(--lime-glow);
+  padding: 2px 4px; white-space: nowrap;
+}
+.trail-toggle:hover { text-decoration: underline; }
+.trail-diff { padding: 6px 0 10px; }
+.d-pair { margin-top: 8px; }
+.d-old {
+  font-size: 12px; color: var(--fg-faint);
+  text-decoration: line-through;
+  text-decoration-color: rgba(255,77,77,0.5);
+  padding: 3px 8px; border-left: 2px solid rgba(255,77,77,0.35);
+}
+.d-new {
+  font-size: 12px; color: var(--lime-glow);
+  padding: 3px 8px; border-left: 2px solid var(--lime);
+  margin-top: 2px;
+}
+
+/* undo link on a freshly shipped row */
+.row-undo {
+  appearance: none; background: none; border: none; cursor: pointer;
+  font-size: 12px; font-weight: 500; color: var(--lime-glow);
+  padding: 0;
+}
+.row-undo:hover { text-decoration: underline; }
 
 .sheet-foot {
   flex: none; padding: 13px 22px calc(15px + env(safe-area-inset-bottom));
