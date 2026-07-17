@@ -179,12 +179,115 @@ function syncStatus() {
     `${running} agent${running === 1 ? '' : 's'} running` + (needs ? ` · ${needs} needs you` : '');
   const badge = document.getElementById('tabBadge');
   badge.textContent = needs ? `·${needs}` : '';
-  // home canvas mirrors the same truth
-  document.getElementById('statShipped').textContent = shippedN;
-  document.getElementById('statRunning').textContent = running;
-  document.getElementById('statNeeds').textContent = needs;
-  document.getElementById('statNeeds').parentElement.classList.toggle('lime', needs > 0);
+  renderCanvas();
 }
+
+/* ============================================================
+   The quiet canvas — one decision, your day, momentum, memory.
+   Everything derives from WORK plus a little scripted context.
+   ============================================================ */
+const WEEK_PRIOR = [3, 5, 4, 6];   // Mon–Thu, before today
+const DAY_PLAN = [
+  { time: '11:00', what: 'Investor call — Meridian', pill: 'notes ready' },
+  { time: '15:00', what: 'Ops interview — Ananya R.', pill: 'brief ready' },
+  { time: '—', what: 'Nothing else. I kept your afternoon clear on purpose.', quiet: true },
+];
+const LEARNED = [
+  { txt: 'Your audience opens short subject lines — under six words', src: 'from 3 sends' },
+  { txt: 'Fintech journalists reply to you on Tuesdays', src: 'from outreach' },
+  { txt: 'You prefer booking calls after 2pm', fix: true },
+];
+let decisionDeferred = false;
+
+function renderCanvas() {
+  const inner = document.getElementById('canvasInner');
+  if (!inner) return;
+  const needs = WORK.filter(w => w.status === 'needs-you');
+  const shippedN = WORK.filter(w => w.status === 'shipped').length;
+
+  const greet = needs.length
+    ? `Morning. While you slept, things moved — one is waiting on your eyes.`
+    : `Morning. Everything that moved overnight is handled.`;
+
+  let decision = '';
+  if (needs.length && !decisionDeferred) {
+    const w = needs[0];
+    decision = `
+    <div class="c-sec">
+      <div class="group-label">Needs you</div>
+      <div class="approval-card" data-open-sheet="${w.id}" tabindex="0" role="button">
+        <div class="who"><span class="avatar">${w.who}</span>
+          <span class="name">${w.whoName} <span class="role">· ${w.whoRole}</span></span></div>
+        <p class="say">${w.say}</p>
+        <div class="c-card-act">
+          <button class="cta" data-open-sheet="${w.id}">Review now</button>
+          <button class="c-later">Later today</button>
+        </div>
+      </div>
+    </div>`;
+  } else if (needs.length && decisionDeferred) {
+    decision = `<div class="c-sec"><p class="c-waiting">1 thing waiting for tonight · <button class="c-now">actually, show me now</button></p></div>`;
+  } else {
+    decision = `<div class="c-sec"><p class="c-handled">Nothing needs you right now. Agents are working; experts are checking. That's the whole point.</p></div>`;
+  }
+
+  const week = [...WEEK_PRIOR, shippedN];
+  const total = week.reduce((a, b) => a + b, 0);
+  const max = Math.max(...week);
+  const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'today'];
+  const bars = week.map((v, i) =>
+    `<div class="mo-bar ${i === week.length - 1 ? 'today' : ''}" style="height:${Math.round((v / max) * 100)}%"></div>`).join('');
+  const days = labels.map((l, i) =>
+    `<span class="${i === labels.length - 1 ? 'today' : ''}">${l}${i === labels.length - 1 ? ' · ' + week[4] : ''}</span>`).join('');
+
+  const dayRows = DAY_PLAN.map(d => `
+    <div class="day-row">
+      <span class="dr-time">${d.time}</span>
+      <span class="dr-what ${d.quiet ? 'quiet' : ''}">${d.what}</span>
+      ${d.pill ? `<span class="pill ready">${d.pill}</span>` : ''}
+    </div>`).join('');
+
+  const learnRows = LEARNED.map(l => `
+    <div class="learn-row">
+      <span class="lr-txt">${l.txt}</span>
+      ${l.fix ? '<button class="learn-fix">wrong? fix it</button>' : `<span class="lr-src">${l.src}</span>`}
+    </div>`).join('');
+
+  inner.innerHTML = `
+    <p class="canvas-greet">${greet}</p>
+    ${decision}
+    <div class="c-sec"><div class="group-label">Today</div>${dayRows}</div>
+    <div class="c-sec"><div class="group-label">This week</div>
+      <div class="mo-bars">${bars}</div>
+      <div class="mo-days">${days}</div>
+      <p class="mo-line">${total} pieces of work shipped this week. Your best week yet.</p>
+    </div>
+    <div class="c-sec"><div class="group-label">Learned this week</div>${learnRows}</div>
+    <p class="canvas-hint">Click the bar below when you want to talk</p>`;
+
+  inner.querySelectorAll('.approval-card, .approval-card .cta').forEach(el =>
+    pressable(el, el.classList.contains('cta') ? 0.95 : 0.99));
+}
+
+/* canvas interactions: defer the decision, bring it back, correct a memory */
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.c-later')) {
+    e.stopPropagation();
+    decisionDeferred = true;
+    renderCanvas();
+    return;
+  }
+  if (e.target.closest('.c-now')) {
+    decisionDeferred = false;
+    renderCanvas();
+    return;
+  }
+  if (e.target.closest('.learn-fix')) {
+    engageChat();
+    addMsg('you', 'That call-timing note is wrong');
+    typing(() => addMsg('allya', `Unlearned. Which is right — mornings, or no preference at all? Tell me once and I won't ask again.`), 700);
+  }
+});
 
 /* move an item to shipped with a small spring entrance on its new row */
 function shipItem(id, newTitle, newMeta, undoable) {
