@@ -213,7 +213,7 @@ function renderCanvas() {
   if (needs.length && !decisionDeferred) {
     const w = needs[0];
     decision = `
-    <div class="c-sec">
+    <div class="c-sec accent">
       <div class="group-label">Needs you</div>
       <div class="approval-card" data-open-sheet="${w.id}" tabindex="0" role="button">
         <div class="who"><span class="avatar">${w.who}</span>
