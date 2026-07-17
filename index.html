@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Allya — your cofounder</title>
+  <meta name="description" content="Allya by Zeroto10 — an AI execution partner for early-stage founders. Agents do the work, real experts approve it." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,380..520&family=Inter+Tight:wght@400;450;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+
+    <header class="topbar">
+      <div class="brand"><span class="lamp"></span> Allya <span class="date">· Tuesday</span></div>
+      <nav class="tabs" aria-label="Panes">
+        <button class="tab active" data-tab="chat">Talk</button>
+        <button class="tab" data-tab="work">Work <span class="badge" id="tabBadge">·1</span></button>
+      </nav>
+      <div class="spacer"></div>
+      <div class="status-line"><span class="pulse"></span><span id="statusText">2 agents running · 1 needs you</span></div>
+      <button class="kbd" id="kbdHint" title="Focus the composer">⌘K</button>
+    </header>
+
+    <main class="workspace" id="workspace">
+
+      <!-- ================= Conversation ================= -->
+      <section class="pane-chat" aria-label="Conversation with Allya">
+        <div class="thread-scroll" id="threadScroll">
+          <div class="day-mark">Today</div>
+          <div id="thread"></div>
+        </div>
+        <div class="composer">
+          <div class="field">
+            <input id="composerInput" type="text" placeholder="Direct Allya — what's eating your week?" autocomplete="off" />
+            <button class="send" id="sendBtn" aria-label="Send">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M4 12h15M13 6l6 6-6 6" stroke="#0a0a0a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= Work panel ================= -->
+      <aside class="pane-work" aria-label="Work in motion">
+        <div class="work-head">
+          <h2>Work</h2>
+          <span class="split-note"><b>85%</b> agents · <b>15%</b> experts</span>
+        </div>
+        <div id="workPanel"></div>
+      </aside>
+
+    </main>
+  </div>
+
+  <!-- ================= Approval surface ================= -->
+  <div class="scrim" id="scrim"></div>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Review before it ships">
+    <div class="grabber-zone" id="grabZone"><div class="grabber"></div></div>
+    <div class="sheet-head" id="sheetHead"></div>
+    <div class="sheet-body" id="sheetBody"></div>
+    <div class="sheet-foot">
+      <button class="ghost-btn" id="editBtn">Ask for a change</button>
+      <button class="cta" id="approveBtn"><span id="approveLabel">Approve</span></button>
+    </div>
+  </div>
+
+  <div class="shipped" id="shipped"><span class="dot"></span><span class="txt">Shipped.</span></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
