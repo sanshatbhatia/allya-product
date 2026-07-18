@@ -71,12 +71,6 @@ button { font-family: inherit; color: inherit; }
 /* ============================================================
    Shell: topbar over a two-pane split
    ============================================================ */
-/* the brain — Allya's ambient presence, behind everything */
-#brain {
-  position: fixed; inset: 0; z-index: 0;
-  pointer-events: none;
-}
-
 #app {
   position: relative; z-index: 1;
   height: 100dvh;
@@ -132,6 +126,92 @@ button { font-family: inherit; color: inherit; }
   flex: 1.25; min-width: 0;
   display: flex; flex-direction: column;
 }
+
+/* ---- dynamic island: a split pill pinned to the top of the Talk pane ---- */
+.island-wrap {
+  flex: none;
+  display: flex; justify-content: center;
+  padding: 10px 24px 2px;
+}
+.island {
+  display: flex; align-items: stretch;
+  width: 100%; max-width: 440px;
+  height: 40px;
+  background: rgba(23, 23, 23, 0.66);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 999px;
+  overflow: hidden;
+  box-shadow: 0 8px 30px -12px rgba(0, 0, 0, 0.9);
+}
+.isl-cell {
+  display: flex; align-items: center;
+  min-width: 0; overflow: hidden;
+  padding: 0 15px;
+}
+.isl-kpi { flex: 0 0 43%; gap: 8px; border-right: 1px solid var(--hairline); }
+.isl-kpi .isl-dot {
+  flex: none; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--lime); box-shadow: 0 0 7px rgba(145,212,95,0.6);
+}
+.isl-kpi .kpi-track { position: relative; flex: 1; height: 100%; }
+.isl-kpi .kpi-item {
+  position: absolute; inset: 0;
+  display: flex; align-items: center;
+  font-size: 12px; color: var(--fg);
+  white-space: nowrap;
+  will-change: transform, opacity;
+}
+.isl-kpi .kpi-item b { font-weight: 600; color: var(--lime-glow); margin-right: 4px; font-variant-numeric: tabular-nums; }
+
+.isl-todo {
+  flex: 1; gap: 9px;
+  appearance: none; background: none; border: none; cursor: pointer;
+  text-align: left;
+}
+.isl-todo:hover { background: rgba(255,255,255,0.03); }
+.isl-todo .todo-tag {
+  flex: none; font-size: 10px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--fg-faint);
+}
+.isl-todo .todo-track {
+  position: relative; flex: 1; height: 100%; overflow: hidden;
+}
+.isl-todo .todo-list { position: absolute; left: 0; top: 0; will-change: transform; }
+.isl-todo .todo-item {
+  height: 40px; display: flex; align-items: center; gap: 7px;
+  font-size: 12px; color: var(--fg-soft); white-space: nowrap;
+}
+.isl-todo .todo-item .td-dot { flex: none; width: 5px; height: 5px; border-radius: 50%; background: var(--fg-faint); }
+.isl-todo .todo-item .td-dot.needs { background: var(--lime); box-shadow: 0 0 6px rgba(145,212,95,0.6); }
+
+/* ---- home canvas layout: side-by-side decision + day, brain hero ---- */
+.c-row {
+  display: flex; gap: 14px; align-items: stretch;
+}
+.c-row > .c-sec { flex: 1; min-width: 0; margin: 0; }
+.c-row > .c-sec.accent { flex: 1.08; }
+
+/* the brain — Allya's model of the company, made touchable */
+.brain-box {
+  position: relative;
+  padding: 0; overflow: hidden;
+  min-height: 300px;
+}
+.brain-box .brain-head {
+  position: absolute; top: 14px; left: 16px; right: 16px; z-index: 2;
+  display: flex; align-items: baseline; justify-content: space-between;
+  pointer-events: none;
+}
+.brain-box .brain-title { font-size: 12.5px; font-weight: 500; color: var(--fg); }
+.brain-box .brain-sub { font-size: 11px; color: var(--fg-faint); }
+.brain-box canvas {
+  display: block; width: 100%; height: 100%;
+  touch-action: none; cursor: grab;
+}
+.brain-box canvas:active { cursor: grabbing; }
 .thread-scroll {
   flex: 1; min-height: 0;
   overflow-y: auto;
@@ -150,7 +230,7 @@ button { font-family: inherit; color: inherit; }
   will-change: transform, opacity;
 }
 .canvas-inner {
-  margin: auto; width: 100%; max-width: 480px; padding: 14px 0;
+  margin: auto; width: 100%; max-width: 720px; padding: 10px 0;
   display: flex; flex-direction: column; gap: 14px;
 }
 .canvas-greet {
@@ -209,36 +289,6 @@ button { font-family: inherit; color: inherit; }
 .day-row .dr-what { flex: 1; min-width: 0; font-size: 13.5px; color: var(--fg); }
 .day-row .dr-what.quiet { font-family: var(--serif); color: var(--fg-soft); font-size: 13px; }
 .pill.ready { color: var(--lime-glow); background: var(--lime-dim); border-color: rgba(145,212,95,0.4); }
-
-/* momentum bars */
-.mo-bars { display: flex; align-items: flex-end; gap: 7px; height: 54px; }
-.mo-bar {
-  flex: 1; background: var(--raised); border-radius: 3px 3px 0 0;
-  min-height: 4px;
-}
-.mo-bar.today { background: var(--lime); }
-.mo-days { display: flex; gap: 7px; margin-top: 5px; }
-.mo-days span { flex: 1; font-size: 10.5px; color: var(--fg-faint); text-align: center; }
-.mo-days span.today { color: var(--lime-glow); }
-.mo-line { font-family: var(--serif); font-size: 13px; color: var(--fg-soft); margin: 13px 0 0; }
-
-/* learned rows */
-.learn-row {
-  display: flex; align-items: baseline; gap: 12px;
-  padding: 9px 2px;
-  border-bottom: 1px solid var(--hairline);
-  font-size: 13px; color: var(--fg-soft);
-  line-height: 1.45;
-}
-.learn-row:first-of-type { padding-top: 2px; }
-.learn-row:last-child { border-bottom: none; }
-.learn-row .lr-txt { flex: 1; min-width: 0; }
-.learn-row .lr-src { flex: none; font-size: 11px; color: var(--fg-faint); }
-.learn-fix {
-  appearance: none; background: none; border: none; cursor: pointer;
-  flex: none; font-size: 11.5px; font-weight: 500; color: var(--lime-glow); padding: 0;
-}
-.learn-fix:hover { text-decoration: underline; }
 
 .canvas-hint { font-size: 12px; color: var(--fg-faint); margin: 8px 0 0; text-align: center; }
 .day-mark { text-align: center; font-size: 11.5px; color: var(--fg-faint); letter-spacing: 0.05em; margin: 4px 0 16px; }
@@ -658,6 +708,13 @@ button { font-family: inherit; color: inherit; }
   .thread-scroll { padding: 16px 18px 10px; }
   .composer { padding: 10px 16px 14px; }
   .msg-block { max-width: 88%; }
+
+  .island-wrap { padding: 8px 16px 2px; }
+  .island { max-width: none; }
+  /* stack the decision + day when the pane is narrow */
+  .c-row { flex-direction: column; }
+  .c-row > .c-sec.accent { flex: 1; }
+  .canvas { padding: 16px 18px; }
 
   /* approval becomes a bottom sheet */
   .sheet {

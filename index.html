@@ -11,7 +11,6 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <canvas id="brain" aria-hidden="true"></canvas>
   <div id="app">
 
     <header class="topbar">
@@ -29,8 +28,25 @@
 
       <!-- ================= Conversation ================= -->
       <section class="pane-chat" id="paneChat" aria-label="Conversation with Allya">
+        <!-- dynamic island: KPIs | running to-do ticker -->
+        <div class="island-wrap">
+          <div class="island" id="island" aria-label="Live status">
+            <div class="isl-cell isl-kpi" id="islKpi"></div>
+            <button class="isl-cell isl-todo" id="islTodo" aria-label="Open what needs you"></button>
+          </div>
+        </div>
         <div class="canvas" id="canvas">
-          <div class="canvas-inner" id="canvasInner"></div>
+          <div class="canvas-inner" id="canvasInner">
+            <div id="canvasTop"></div>
+            <div class="c-sec brain-box" id="brainBox">
+              <div class="brain-head">
+                <span class="brain-title">The brain</span>
+                <span class="brain-sub">your company, as I understand it</span>
+              </div>
+              <canvas id="brainCanvas"></canvas>
+            </div>
+            <p class="canvas-hint">Click the bar below when you want to talk</p>
+          </div>
         </div>
         <div class="thread-scroll" id="threadScroll">
           <div class="day-mark">Today</div>

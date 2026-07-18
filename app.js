@@ -180,30 +180,24 @@ function syncStatus() {
   const badge = document.getElementById('tabBadge');
   badge.textContent = needs ? `·${needs}` : '';
   renderCanvas();
+  if (window.__island) window.__island.refresh();
 }
 
 /* ============================================================
-   The quiet canvas — one decision, your day, momentum, memory.
-   Everything derives from WORK plus a little scripted context.
+   The quiet canvas — one decision + your day, side by side,
+   above the brain. Everything derives from WORK plus scripted context.
    ============================================================ */
-const WEEK_PRIOR = [3, 5, 4, 6];   // Mon–Thu, before today
 const DAY_PLAN = [
   { time: '11:00', what: 'Investor call — Meridian', pill: 'notes ready' },
   { time: '15:00', what: 'Ops interview — Ananya R.', pill: 'brief ready' },
   { time: '—', what: 'Nothing else. I kept your afternoon clear on purpose.', quiet: true },
 ];
-const LEARNED = [
-  { txt: 'Your audience opens short subject lines — under six words', src: 'from 3 sends' },
-  { txt: 'Fintech journalists reply to you on Tuesdays', src: 'from outreach' },
-  { txt: 'You prefer booking calls after 2pm', fix: true },
-];
 let decisionDeferred = false;
 
 function renderCanvas() {
-  const inner = document.getElementById('canvasInner');
-  if (!inner) return;
+  const top = document.getElementById('canvasTop');
+  if (!top) return;
   const needs = WORK.filter(w => w.status === 'needs-you');
-  const shippedN = WORK.filter(w => w.status === 'shipped').length;
 
   const greet = needs.length
     ? `Morning. While you slept, things moved — one is waiting on your eyes.`
@@ -226,19 +220,10 @@ function renderCanvas() {
       </div>
     </div>`;
   } else if (needs.length && decisionDeferred) {
-    decision = `<div class="c-sec"><p class="c-waiting">1 thing waiting for tonight · <button class="c-now">actually, show me now</button></p></div>`;
+    decision = `<div class="c-sec accent"><div class="group-label">Needs you</div><p class="c-waiting">1 thing waiting for tonight · <button class="c-now">actually, show me now</button></p></div>`;
   } else {
-    decision = `<div class="c-sec"><p class="c-handled">Nothing needs you right now. Agents are working; experts are checking. That's the whole point.</p></div>`;
+    decision = `<div class="c-sec"><div class="group-label">Needs you</div><p class="c-handled">Nothing right now. Agents are working; experts are checking. That's the whole point.</p></div>`;
   }
-
-  const week = [...WEEK_PRIOR, shippedN];
-  const total = week.reduce((a, b) => a + b, 0);
-  const max = Math.max(...week);
-  const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'today'];
-  const bars = week.map((v, i) =>
-    `<div class="mo-bar ${i === week.length - 1 ? 'today' : ''}" style="height:${Math.round((v / max) * 100)}%"></div>`).join('');
-  const days = labels.map((l, i) =>
-    `<span class="${i === labels.length - 1 ? 'today' : ''}">${l}${i === labels.length - 1 ? ' · ' + week[4] : ''}</span>`).join('');
 
   const dayRows = DAY_PLAN.map(d => `
     <div class="day-row">
@@ -247,29 +232,18 @@ function renderCanvas() {
       ${d.pill ? `<span class="pill ready">${d.pill}</span>` : ''}
     </div>`).join('');
 
-  const learnRows = LEARNED.map(l => `
-    <div class="learn-row">
-      <span class="lr-txt">${l.txt}</span>
-      ${l.fix ? '<button class="learn-fix">wrong? fix it</button>' : `<span class="lr-src">${l.src}</span>`}
-    </div>`).join('');
-
-  inner.innerHTML = `
+  top.innerHTML = `
     <p class="canvas-greet">${greet}</p>
-    ${decision}
-    <div class="c-sec"><div class="group-label">Today</div>${dayRows}</div>
-    <div class="c-sec"><div class="group-label">This week</div>
-      <div class="mo-bars">${bars}</div>
-      <div class="mo-days">${days}</div>
-      <p class="mo-line">${total} pieces of work shipped this week. Your best week yet.</p>
-    </div>
-    <div class="c-sec"><div class="group-label">Learned this week</div>${learnRows}</div>
-    <p class="canvas-hint">Click the bar below when you want to talk</p>`;
+    <div class="c-row">
+      ${decision}
+      <div class="c-sec"><div class="group-label">Today</div>${dayRows}</div>
+    </div>`;
 
-  inner.querySelectorAll('.approval-card, .approval-card .cta').forEach(el =>
+  top.querySelectorAll('.approval-card, .approval-card .cta').forEach(el =>
     pressable(el, el.classList.contains('cta') ? 0.95 : 0.99));
 }
 
-/* canvas interactions: defer the decision, bring it back, correct a memory */
+/* canvas interactions: defer the decision, bring it back */
 document.addEventListener('click', (e) => {
   if (e.target.closest('.c-later')) {
     e.stopPropagation();
@@ -281,11 +255,6 @@ document.addEventListener('click', (e) => {
     decisionDeferred = false;
     renderCanvas();
     return;
-  }
-  if (e.target.closest('.learn-fix')) {
-    engageChat();
-    addMsg('you', 'That call-timing note is wrong');
-    typing(() => addMsg('allya', `Unlearned. Which is right — mornings, or no preference at all? Tell me once and I won't ask again.`), 700);
   }
 });
 
@@ -813,102 +782,392 @@ function unshipItem(id) {
 }
 
 /* ============================================================
-   The brain — Allya thinking, ambiently.
-   Drifting thought-nodes, faint connections, and synapse pulses
-   that fire along them. Deliberately quiet: it should read as a
-   presence you sense, not a screensaver you watch.
+   Dynamic island — a split pill pinned to the top of the Talk pane.
+   Left: KPIs, stepping one at a time. Right: the to-do list in
+   continuous running motion. "Divided in 2, like the old design."
    ============================================================ */
-(function brain() {
-  const canvas = document.getElementById('brain');
-  if (!canvas || reduceMotion) { if (canvas) canvas.remove(); return; }
-  const ctx2 = canvas.getContext('2d');
-  let W = 0, H = 0, dpr = 1, nodes = [], pulses = [];
-  const LINK = 150;
+(function island() {
+  const kpiCell = document.getElementById('islKpi');
+  const todoCell = document.getElementById('islTodo');
+  if (!kpiCell || !todoCell) return;
+  const ROW = 40;                 // island height / row height
+  let kpiTrack, todoTrack, kpiItems = [], kpiIdx = 0, kpiTimer = 0;
+  let todoOffset = 0, todoLoopH = 0;
+  let raf = 0, last = 0;
+  const kpiStep = new Spring(0, { response: 0.5, damping: 0.85, onframe: (y) => {
+    if (kpiTrack) kpiTrack.style.transform = `translateY(${-y}px)`;
+  }});
 
-  function resize() {
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
-    W = window.innerWidth; H = window.innerHeight;
-    canvas.width = W * dpr; canvas.height = H * dpr;
-    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
-    ctx2.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const n = clamp(Math.round((W * H) / 26000), 24, 54);
-    while (nodes.length < n) nodes.push(mkNode());
-    nodes.length = n;
+  function kpis() {
+    const running = WORK.filter(w => w.status === 'running').length;
+    const needs = WORK.filter(w => w.status === 'needs-you').length;
+    const shipped = WORK.filter(w => w.status === 'shipped').length + 12;   // +12 earlier this week
+    return [
+      { n: shipped, l: 'shipped this week' },
+      { n: running, l: running === 1 ? 'agent running' : 'agents running' },
+      { n: needs, l: needs === 1 ? 'thing needs you' : 'things need you' },
+      { n: '₹0', l: 'spent · first month free' },
+    ];
   }
-  function mkNode() {
-    return {
-      x: Math.random() * W, y: Math.random() * H,
-      vx: (Math.random() - 0.5) * 12, vy: (Math.random() - 0.5) * 12,
-      r: 1 + Math.random() * 1.4,
-    };
+  function todos() {
+    const needs = WORK.filter(w => w.status === 'needs-you').map(w => ({ needs: true, t: shortTitle(w) }));
+    const running = WORK.filter(w => w.status === 'running').map(w => ({ needs: false, t: shortTitle(w) }));
+    const list = [...needs, ...running];
+    return list.length ? list : [{ needs: false, t: 'All clear — nothing waiting' }];
   }
-  function firePulse() {
-    // pick a random close pair and send a spark along the line
-    for (let tries = 0; tries < 12; tries++) {
-      const a = nodes[(Math.random() * nodes.length) | 0];
-      const b = nodes[(Math.random() * nodes.length) | 0];
-      if (a === b) continue;
-      const d = Math.hypot(a.x - b.x, a.y - b.y);
-      if (d < LINK) { pulses.push({ a, b, t: 0, dur: 0.55 + Math.random() * 0.5 }); return; }
-    }
+  function shortTitle(w) {
+    if (w.id === 'newsletter') return 'Approve next week’s newsletter';
+    if (w.status === 'needs-you') return 'Review — ' + (w.title || 'waiting on you');
+    return (w.title || '').replace(/ from last week’s signups| against your approved JD| matched to your space/, '');
   }
 
-  let last = performance.now(), pulseClock = 0;
-  function frame(now) {
+  function build() {
+    // KPI: a vertical track; wraps by appending a clone of the first item
+    kpiItems = kpis();
+    kpiIdx = 0; kpiTimer = 0;
+    kpiCell.innerHTML = `<span class="isl-dot"></span><div class="kpi-track"></div>`;
+    kpiTrack = kpiCell.querySelector('.kpi-track');
+    const all = [...kpiItems, kpiItems[0]];
+    kpiTrack.innerHTML = all.map((k, i) =>
+      `<div class="kpi-item" style="transform:translateY(${i * ROW}px)"><span><b>${k.n}</b> ${k.l}</span></div>`).join('');
+    kpiStep.stop(); kpiStep.x = 0; kpiTrack.style.transform = 'translateY(0px)';
+
+    // to-do: duplicate the list so the upward scroll is seamless
+    const list = todos();
+    todoLoopH = list.length * ROW;
+    todoCell.innerHTML =
+      `<span class="todo-tag">to-do</span><div class="todo-track"><div class="todo-list"></div></div>`;
+    todoTrack = todoCell.querySelector('.todo-list');
+    todoTrack.innerHTML = [...list, ...list].map(t =>
+      `<div class="todo-item"><span class="td-dot ${t.needs ? 'needs' : ''}"></span>${escapeHtml(t.t)}</div>`).join('');
+    todoOffset = 0; todoTrack.style.transform = 'translateY(0px)';
+
+    if (reduceMotion) { todoTrack.style.transform = 'translateY(0px)'; }
+  }
+
+  function refresh() { const wasRunning = !!raf; build(); if (wasRunning) { /* keep looping */ } }
+
+  function tick(now) {
+    if (!raf) return;
     let dt = (now - last) / 1000; last = now;
     if (dt > 0.05) dt = 0.05;
-    ctx2.clearRect(0, 0, W, H);
-
-    for (const p of nodes) {
-      p.x += p.vx * dt; p.y += p.vy * dt;
-      if (p.x < -20) p.x = W + 20; if (p.x > W + 20) p.x = -20;
-      if (p.y < -20) p.y = H + 20; if (p.y > H + 20) p.y = -20;
-    }
-
-    // connections
-    for (let i = 0; i < nodes.length; i++) {
-      for (let j = i + 1; j < nodes.length; j++) {
-        const a = nodes[i], b = nodes[j];
-        const d = Math.hypot(a.x - b.x, a.y - b.y);
-        if (d < LINK) {
-          const alpha = 0.055 * (1 - d / LINK);
-          ctx2.strokeStyle = `rgba(145, 212, 95, ${alpha})`;
-          ctx2.lineWidth = 1;
-          ctx2.beginPath(); ctx2.moveTo(a.x, a.y); ctx2.lineTo(b.x, b.y); ctx2.stroke();
+    const hidden = document.hidden || !todoCell.offsetParent;
+    if (!hidden && !reduceMotion) {
+      // KPI steps every ~3.2s
+      kpiTimer += dt;
+      if (kpiTimer > 3.2) {
+        kpiTimer = 0;
+        kpiIdx++;
+        kpiStep.to(kpiIdx * ROW);
+        if (kpiIdx >= kpiItems.length) {   // landed on the appended clone → snap home
+          setTimeout(() => { kpiIdx = 0; kpiStep.stop(); kpiStep.x = 0; if (kpiTrack) kpiTrack.style.transform = 'translateY(0px)'; }, 520);
         }
       }
+      // to-do scrolls up continuously
+      todoOffset += dt * 22;
+      if (todoOffset >= todoLoopH) todoOffset -= todoLoopH;
+      if (todoTrack) todoTrack.style.transform = `translateY(${-todoOffset}px)`;
     }
-    // nodes
-    for (const p of nodes) {
-      ctx2.fillStyle = 'rgba(145, 212, 95, 0.14)';
-      ctx2.beginPath(); ctx2.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx2.fill();
+    raf = requestAnimationFrame(tick);
+  }
+
+  function start() { if (raf) return; last = performance.now(); raf = requestAnimationFrame(tick); }
+  function stop() { cancelAnimationFrame(raf); raf = 0; }
+
+  todoCell.addEventListener('click', () => {
+    const top = WORK.find(w => w.status === 'needs-you');
+    if (top) openSheet(top.id);
+    else input.focus();
+  });
+  document.addEventListener('visibilitychange', () => (document.hidden ? stop() : start()));
+
+  build();
+  start();
+  window.__island = { refresh, start, stop };
+})();
+
+/* ============================================================
+   The company brain — Allya's model of the business, made touchable.
+   A labeled graph: a hub (your company), its departments, and the
+   concrete things under them (some mapped to live WORK). It holds a
+   clean shape, drifts gently, fires "thoughts" along its edges, and
+   reacts to touch — hover excites a node and ripples to neighbours,
+   drag moves it 1:1, tap sends a thought. Data-driven per client.
+   ============================================================ */
+(function companyBrain() {
+  const canvas = document.getElementById('brainCanvas');
+  const box = document.getElementById('brainBox');
+  if (!canvas || !box) return;
+  const ctx = canvas.getContext('2d');
+
+  // ---- graph: groups carry a restrained tint; leaves inherit their dept ----
+  const GROUPS = {
+    core:      '#91d45f',
+    marketing: '#91d45f',
+    hiring:    '#d9a441',
+    pr:        '#a78bda',
+    sales:     '#5fbfa8',
+    ops:       '#6f9fd8',
+  };
+  const DEF = {
+    nodes: [
+      { id: 'co', label: 'Your company', tier: 0, group: 'core' },
+      { id: 'marketing', label: 'Marketing', tier: 1, group: 'marketing', parent: 'co' },
+      { id: 'hiring', label: 'Hiring', tier: 1, group: 'hiring', parent: 'co' },
+      { id: 'pr', label: 'PR', tier: 1, group: 'pr', parent: 'co' },
+      { id: 'sales', label: 'Sales', tier: 1, group: 'sales', parent: 'co' },
+      { id: 'ops', label: 'Ops', tier: 1, group: 'ops', parent: 'co' },
+      { id: 'newsletter', label: 'Newsletter', tier: 2, group: 'marketing', parent: 'marketing', work: 'newsletter' },
+      { id: 'campaigns', label: 'Campaigns', tier: 2, group: 'marketing', parent: 'marketing' },
+      { id: 'seo', label: 'SEO', tier: 2, group: 'marketing', parent: 'marketing' },
+      { id: 'candidates', label: 'Candidates', tier: 2, group: 'hiring', parent: 'hiring', work: 'screening' },
+      { id: 'jd', label: 'JD', tier: 2, group: 'hiring', parent: 'hiring', work: 'jd' },
+      { id: 'presslist', label: 'Press list', tier: 2, group: 'pr', parent: 'pr', work: 'press' },
+      { id: 'journalists', label: 'Journalists', tier: 2, group: 'pr', parent: 'pr' },
+      { id: 'leads', label: 'Leads', tier: 2, group: 'sales', parent: 'sales', work: 'leads' },
+      { id: 'crm', label: 'CRM', tier: 2, group: 'sales', parent: 'sales', work: 'crm' },
+      { id: 'pipeline', label: 'Pipeline', tier: 2, group: 'sales', parent: 'sales' },
+      { id: 'calendar', label: 'Calendar', tier: 2, group: 'ops', parent: 'ops' },
+      { id: 'docs', label: 'Docs', tier: 2, group: 'ops', parent: 'ops' },
+    ],
+    // cross-links add richness beyond the parent tree
+    cross: [['leads', 'campaigns'], ['journalists', 'presslist'], ['pipeline', 'crm'], ['calendar', 'candidates']],
+  };
+
+  const byId = {};
+  DEF.nodes.forEach(n => (byId[n.id] = n));
+  const edges = [];
+  DEF.nodes.forEach(n => { if (n.parent) edges.push([n.parent, n.id]); });
+  DEF.cross.forEach(([a, b]) => edges.push([a, b]));
+
+  let W = 0, H = 0, dpr = 1;
+  let pulses = [], thoughtClock = 0, tSeed = Math.random() * 1000;
+  const nodes = DEF.nodes.map(n => ({ ...n, x: 0, y: 0, hx: 0, hy: 0, vx: 0, vy: 0, ex: 0, phase: Math.random() * Math.PI * 2 }));
+  const nodeById = {}; nodes.forEach(n => (nodeById[n.id] = n));
+
+  function layout() {
+    const cx = W / 2, cy = H / 2;
+    const rx1 = W * 0.24, ry1 = H * 0.30, rx2 = W * 0.42, ry2 = H * 0.40;
+    const depts = nodes.filter(n => n.tier === 1);
+    depts.forEach((d, i) => {
+      const a = (-Math.PI / 2) + (i / depts.length) * Math.PI * 2;
+      d.hx = cx + Math.cos(a) * rx1; d.hy = cy + Math.sin(a) * ry1; d._a = a;
+    });
+    depts.forEach(d => {
+      const leaves = nodes.filter(n => n.parent === d.id);
+      leaves.forEach((l, j) => {
+        const spread = (j - (leaves.length - 1) / 2) * 0.42;
+        const a = d._a + spread;
+        l.hx = cx + Math.cos(a) * rx2; l.hy = cy + Math.sin(a) * ry2;
+      });
+    });
+    const hub = nodeById.co; hub.hx = cx; hub.hy = cy;
+    // seed positions at home the first time
+    nodes.forEach(n => { if (n.x === 0 && n.y === 0) { n.x = n.hx; n.y = n.hy; } });
+  }
+
+  function resize() {
+    const w = box.clientWidth, h = box.clientHeight;
+    if (!w || !h) return false;
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = w; H = h;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    layout();
+    return true;
+  }
+
+  const R = { 0: 6.5, 1: 4.6, 2: 3.2 };
+  function nodeR(n) { return R[n.tier] * (1 + n.ex * 0.6); }
+
+  function excite(n, amt) { n.ex = clamp(n.ex + amt, 0, 1.4); }
+
+  function fireEdge(a, b, delay) { pulses.push({ a: nodeById[a.id ? a.id : a], b: nodeById[b.id ? b.id : b], delay: delay || 0, t: 0, dur: 0.5 + Math.random() * 0.25 }); }
+
+  function pathToHub(n) {
+    const path = []; let cur = n;
+    while (cur) { path.push(cur); cur = cur.parent ? nodeById[cur.parent] : null; }
+    return path.reverse();   // hub → … → n
+  }
+  function fireThought(target) {
+    const t = target || pickThoughtTarget();
+    const path = pathToHub(t);
+    for (let i = 0; i < path.length - 1; i++) fireEdge(path[i], path[i + 1], i * 0.16);
+    excite(path[0], 0.5);
+  }
+  function pickThoughtTarget() {
+    // bias toward nodes with live work
+    const live = nodes.filter(n => n.work && WORK.find(w => w.id === n.work && w.status !== 'shipped'));
+    const pool = live.length && Math.random() < 0.6 ? live : nodes.filter(n => n.tier === 2);
+    return pool[(Math.random() * pool.length) | 0];
+  }
+
+  // ---- interaction ----
+  let hoverNode = null, dragNode = null, grabDX = 0, grabDY = 0, pHist = [];
+  function nodeAt(px, py) {
+    let best = null, bestD = 1e9;
+    for (const n of nodes) {
+      const d = Math.hypot(px - n.x, py - n.y);
+      const hit = nodeR(n) + 13;
+      if (d < hit && d < bestD) { best = n; bestD = d; }
     }
-    // synapse pulses — a bright thought travelling a connection
-    pulseClock += dt;
-    if (pulseClock > 0.9) { pulseClock = 0; if (Math.random() < 0.8) firePulse(); }
-    pulses = pulses.filter(s => (s.t += dt / s.dur) < 1);
+    return best;
+  }
+  function localPt(e) { const r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+
+  canvas.addEventListener('pointermove', (e) => {
+    const [px, py] = localPt(e);
+    if (dragNode) {
+      dragNode.x = px - grabDX; dragNode.y = py - grabDY; dragNode.vx = dragNode.vy = 0;
+      pHist.push({ t: performance.now(), x: px, y: py }); if (pHist.length > 5) pHist.shift();
+      return;
+    }
+    const n = nodeAt(px, py);
+    if (n !== hoverNode) {
+      hoverNode = n;
+      if (n) { excite(n, 0.7); nodes.filter(m => edges.some(([a, b]) => (byName(a) === n.id && byName(b) === m.id) || (byName(b) === n.id && byName(a) === m.id))).forEach(m => fireEdge(n, m, 0)); }
+    }
+    canvas.style.cursor = n ? 'pointer' : 'grab';
+  });
+  function byName(x) { return x; }
+  canvas.addEventListener('pointerdown', (e) => {
+    const [px, py] = localPt(e);
+    const n = nodeAt(px, py);
+    if (n) {
+      dragNode = n; grabDX = px - n.x; grabDY = py - n.y;
+      pHist = [{ t: performance.now(), x: px, y: py }];
+      canvas.setPointerCapture(e.pointerId);
+      excite(n, 0.5);
+    } else {
+      fireThought();   // tap on empty space — Allya puts a thought
+    }
+  });
+  function endDrag() {
+    if (!dragNode) return;
+    // hand release velocity back to the node, then it springs home
+    if (pHist.length > 1) {
+      const a = pHist[0], b = pHist[pHist.length - 1];
+      const dt = (b.t - a.t) / 1000;
+      if (dt > 0) { dragNode.vx = (b.x - a.x) / dt * 0.02; dragNode.vy = (b.y - a.y) / dt * 0.02; }
+    }
+    const moved = pHist.length > 1 && Math.hypot(pHist[pHist.length - 1].x - pHist[0].x, pHist[pHist.length - 1].y - pHist[0].y);
+    if (!moved || moved < 4) fireThought(dragNode);   // it was a tap
+    dragNode = null;
+  }
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+  canvas.addEventListener('pointerleave', () => { hoverNode = null; });
+
+  // ---- simulation + draw ----
+  const K_HOME = 34, K_EDGE = 10, DAMP = 5.2;
+  function step(dt) {
+    // gentle drift of home targets keeps it alive
+    const time = performance.now() / 1000 + tSeed;
+    for (const n of nodes) {
+      if (n === dragNode) continue;
+      const driftX = Math.sin(time * 0.5 + n.phase) * (n.tier === 0 ? 1.5 : 4);
+      const driftY = Math.cos(time * 0.42 + n.phase) * (n.tier === 0 ? 1.5 : 4);
+      const tx = n.hx + driftX, ty = n.hy + driftY;
+      let ax = (tx - n.x) * K_HOME, ay = (ty - n.y) * K_HOME;
+      n.vx += ax * dt; n.vy += ay * dt;
+    }
+    // edge springs — the web reacts when a node is pulled
+    for (const [aid, bid] of edges) {
+      const a = nodeById[aid], b = nodeById[bid];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const d = Math.hypot(dx, dy) || 0.001;
+      const rest = Math.hypot(b.hx - a.hx, b.hy - a.hy);
+      const f = (d - rest) * K_EDGE;
+      const ux = dx / d, uy = dy / d;
+      if (a !== dragNode) { a.vx += ux * f * dt; a.vy += uy * f * dt; }
+      if (b !== dragNode) { b.vx -= ux * f * dt; b.vy -= uy * f * dt; }
+    }
+    const fr = Math.exp(-DAMP * dt);
+    for (const n of nodes) {
+      if (n === dragNode) continue;
+      n.vx *= fr; n.vy *= fr;
+      n.x += n.vx * dt; n.y += n.vy * dt;
+    }
+    for (const n of nodes) n.ex = Math.max(0, n.ex - dt * 1.1);
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    // edges
+    for (const [aid, bid] of edges) {
+      const a = nodeById[aid], b = nodeById[bid];
+      const lit = Math.max(a.ex, b.ex);
+      ctx.strokeStyle = `rgba(145, 212, 95, ${0.07 + lit * 0.22})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+    // pulses (thoughts travelling edges)
     for (const s of pulses) {
-      const x = s.a.x + (s.b.x - s.a.x) * s.t;
-      const y = s.a.y + (s.b.y - s.a.y) * s.t;
-      const fade = Math.sin(s.t * Math.PI);
-      ctx2.fillStyle = `rgba(180, 232, 138, ${0.5 * fade})`;
-      ctx2.beginPath(); ctx2.arc(x, y, 1.8, 0, Math.PI * 2); ctx2.fill();
-      ctx2.strokeStyle = `rgba(145, 212, 95, ${0.16 * fade})`;
-      ctx2.lineWidth = 1;
-      ctx2.beginPath(); ctx2.moveTo(s.a.x, s.a.y); ctx2.lineTo(x, y); ctx2.stroke();
+      if (s.delay > 0) continue;
+      const x = s.a.x + (s.b.x - s.a.x) * s.t, y = s.a.y + (s.b.y - s.a.y) * s.t;
+      const fade = Math.sin(clamp(s.t, 0, 1) * Math.PI);
+      ctx.fillStyle = `rgba(180, 232, 138, ${0.85 * fade})`;
+      ctx.beginPath(); ctx.arc(x, y, 2.4, 0, Math.PI * 2); ctx.fill();
+    }
+    // nodes + labels
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    for (const n of nodes) {
+      const col = GROUPS[n.group] || '#91d45f';
+      const r = nodeR(n);
+      const liveWork = n.work && WORK.find(w => w.id === n.work && w.status === 'needs-you');
+      const base = n.tier === 0 ? 0.95 : n.tier === 1 ? 0.7 : 0.42;
+      const alpha = clamp(base + n.ex * 0.5, 0, 1);
+      if (n.ex > 0.02 || liveWork) {
+        ctx.beginPath(); ctx.arc(n.x, n.y, r + 6 + n.ex * 4, 0, Math.PI * 2);
+        ctx.fillStyle = hexA(liveWork ? '#91d45f' : col, 0.10 + n.ex * 0.14); ctx.fill();
+      }
+      ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = hexA(col, alpha); ctx.fill();
+      if (n.tier === 0) { ctx.lineWidth = 1.5; ctx.strokeStyle = hexA('#b4e88a', 0.7); ctx.stroke(); }
+      // label
+      const lAlpha = clamp((n.tier === 0 ? 0.85 : n.tier === 1 ? 0.5 : 0.28) + n.ex * 0.7, 0, 1);
+      ctx.font = `${n.tier === 0 ? 600 : 500} ${n.tier === 0 ? 12 : n.tier === 1 ? 11 : 10}px "Inter Tight", sans-serif`;
+      ctx.fillStyle = hexA(n.tier === 2 ? '#c7ccd4' : '#f3f4f6', lAlpha);
+      ctx.fillText(n.label, n.x, n.y + r + 3);
     }
   }
-  let running = false;
-  function start() { if (running) return; running = true; last = performance.now(); requestAnimationFrame(loop); }
-  function stop() { running = false; }
-  function loop(now) { if (!running) return; frame(now); requestAnimationFrame(loop); }
+  function hexA(hex, a) {
+    const h = hex.replace('#', '');
+    const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+    return `rgba(${r},${g},${b},${clamp(a, 0, 1)})`;
+  }
 
-  window.addEventListener('resize', resize);
+  let raf = 0, last = 0;
+  function frame(now) {
+    if (!raf) return;
+    let dt = (now - last) / 1000; last = now;
+    if (dt > 0.05) dt = 0.05;
+    if (!box.offsetParent) { raf = requestAnimationFrame(frame); return; }   // hidden (chatting)
+    if (W !== box.clientWidth || H !== box.clientHeight) resize();
+    if (!reduceMotion) {
+      step(dt);
+      // advance thoughts
+      thoughtClock += dt;
+      if (thoughtClock > 2.6) { thoughtClock = 0; fireThought(); }
+      for (const s of pulses) { if (s.delay > 0) { s.delay -= dt; } else { s.t += dt / s.dur; if (s.t >= 0.5 && !s._hit) { s._hit = true; excite(s.b, 0.6); } } }
+      pulses = pulses.filter(s => s.t < 1);
+    }
+    draw();
+    raf = requestAnimationFrame(frame);
+  }
+  function start() {
+    if (raf) return;
+    if (!resize()) { requestAnimationFrame(start); return; }
+    if (reduceMotion) { draw(); return; }   // static graph, no loop
+    last = performance.now(); raf = requestAnimationFrame(frame);
+  }
+  function stop() { cancelAnimationFrame(raf); raf = 0; }
+
+  window.addEventListener('resize', () => { if (resize() && reduceMotion) draw(); });
   document.addEventListener('visibilitychange', () => (document.hidden ? stop() : start()));
-  resize();
   start();
-  // dev handle: lets tooling pause the rAF loop (screenshot capture needs idle frames)
-  window.__brain = { start, stop };
+  window.__brain = { start, stop, fireThought, nodes };
 })();
 
 /* boot */
