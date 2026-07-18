@@ -196,7 +196,8 @@ let decisionDeferred = false;
 
 function renderCanvas() {
   const top = document.getElementById('canvasTop');
-  if (!top) return;
+  const bottom = document.getElementById('canvasBottom');
+  if (!top || !bottom) return;
   const needs = WORK.filter(w => w.status === 'needs-you');
 
   const greet = needs.length
@@ -232,14 +233,14 @@ function renderCanvas() {
       ${d.pill ? `<span class="pill ready">${d.pill}</span>` : ''}
     </div>`).join('');
 
-  top.innerHTML = `
-    <p class="canvas-greet">${greet}</p>
+  top.innerHTML = `<p class="canvas-greet">${greet}</p>`;
+  bottom.innerHTML = `
     <div class="c-row">
       ${decision}
       <div class="c-sec"><div class="group-label">Today</div>${dayRows}</div>
     </div>`;
 
-  top.querySelectorAll('.approval-card, .approval-card .cta').forEach(el =>
+  bottom.querySelectorAll('.approval-card, .approval-card .cta').forEach(el =>
     pressable(el, el.classList.contains('cta') ? 0.95 : 0.99));
 }
 
@@ -917,21 +918,40 @@ function unshipItem(id) {
       { id: 'pr', label: 'PR', tier: 1, group: 'pr', parent: 'co' },
       { id: 'sales', label: 'Sales', tier: 1, group: 'sales', parent: 'co' },
       { id: 'ops', label: 'Ops', tier: 1, group: 'ops', parent: 'co' },
+      // marketing
       { id: 'newsletter', label: 'Newsletter', tier: 2, group: 'marketing', parent: 'marketing', work: 'newsletter' },
       { id: 'campaigns', label: 'Campaigns', tier: 2, group: 'marketing', parent: 'marketing' },
       { id: 'seo', label: 'SEO', tier: 2, group: 'marketing', parent: 'marketing' },
+      { id: 'social', label: 'Social', tier: 2, group: 'marketing', parent: 'marketing' },
+      { id: 'content', label: 'Content', tier: 2, group: 'marketing', parent: 'marketing' },
+      // hiring
       { id: 'candidates', label: 'Candidates', tier: 2, group: 'hiring', parent: 'hiring', work: 'screening' },
       { id: 'jd', label: 'JD', tier: 2, group: 'hiring', parent: 'hiring', work: 'jd' },
+      { id: 'interviews', label: 'Interviews', tier: 2, group: 'hiring', parent: 'hiring' },
+      { id: 'onboarding', label: 'Onboarding', tier: 2, group: 'hiring', parent: 'hiring' },
+      // pr
       { id: 'presslist', label: 'Press list', tier: 2, group: 'pr', parent: 'pr', work: 'press' },
       { id: 'journalists', label: 'Journalists', tier: 2, group: 'pr', parent: 'pr' },
+      { id: 'pitches', label: 'Pitches', tier: 2, group: 'pr', parent: 'pr' },
+      { id: 'coverage', label: 'Coverage', tier: 2, group: 'pr', parent: 'pr' },
+      // sales
       { id: 'leads', label: 'Leads', tier: 2, group: 'sales', parent: 'sales', work: 'leads' },
       { id: 'crm', label: 'CRM', tier: 2, group: 'sales', parent: 'sales', work: 'crm' },
       { id: 'pipeline', label: 'Pipeline', tier: 2, group: 'sales', parent: 'sales' },
+      { id: 'outreach', label: 'Outreach', tier: 2, group: 'sales', parent: 'sales' },
+      // ops
       { id: 'calendar', label: 'Calendar', tier: 2, group: 'ops', parent: 'ops' },
       { id: 'docs', label: 'Docs', tier: 2, group: 'ops', parent: 'ops' },
+      { id: 'finance', label: 'Finance', tier: 2, group: 'ops', parent: 'ops' },
+      { id: 'vendors', label: 'Vendors', tier: 2, group: 'ops', parent: 'ops' },
     ],
-    // cross-links add richness beyond the parent tree
-    cross: [['leads', 'campaigns'], ['journalists', 'presslist'], ['pipeline', 'crm'], ['calendar', 'candidates']],
+    // cross-links weave the tree into a web
+    cross: [
+      ['leads', 'campaigns'], ['journalists', 'presslist'], ['pipeline', 'crm'],
+      ['calendar', 'candidates'], ['social', 'content'], ['outreach', 'leads'],
+      ['coverage', 'journalists'], ['finance', 'pipeline'], ['onboarding', 'docs'],
+      ['pitches', 'campaigns'], ['seo', 'content'], ['interviews', 'calendar'],
+    ],
   };
 
   const byId = {};
@@ -940,29 +960,32 @@ function unshipItem(id) {
   DEF.nodes.forEach(n => { if (n.parent) edges.push([n.parent, n.id]); });
   DEF.cross.forEach(([a, b]) => edges.push([a, b]));
 
-  let W = 0, H = 0, dpr = 1;
-  let pulses = [], thoughtClock = 0, tSeed = Math.random() * 1000;
+  let W = 0, H = 0, dpr = 1, S = 1;
+  let pulses = [], ripples = [], thoughtClock = 0, tSeed = Math.random() * 1000;
+  const TAU = Math.PI * 2;
   const nodes = DEF.nodes.map(n => ({ ...n, x: 0, y: 0, hx: 0, hy: 0, vx: 0, vy: 0, ex: 0, phase: Math.random() * Math.PI * 2 }));
   const nodeById = {}; nodes.forEach(n => (nodeById[n.id] = n));
 
   function layout() {
     const cx = W / 2, cy = H / 2;
-    const rx1 = W * 0.24, ry1 = H * 0.30, rx2 = W * 0.42, ry2 = H * 0.40;
+    const rx1 = W * 0.22, ry1 = H * 0.30, rx2 = W * 0.40, ry2 = H * 0.40;
     const depts = nodes.filter(n => n.tier === 1);
     depts.forEach((d, i) => {
-      const a = (-Math.PI / 2) + (i / depts.length) * Math.PI * 2;
+      const a = (-Math.PI / 2) + (i / depts.length) * TAU;
       d.hx = cx + Math.cos(a) * rx1; d.hy = cy + Math.sin(a) * ry1; d._a = a;
     });
     depts.forEach(d => {
       const leaves = nodes.filter(n => n.parent === d.id);
       leaves.forEach((l, j) => {
-        const spread = (j - (leaves.length - 1) / 2) * 0.42;
+        // tighter fan, staggered radius → depth, no overlap between clusters
+        const spread = (j - (leaves.length - 1) / 2) * 0.30;
         const a = d._a + spread;
-        l.hx = cx + Math.cos(a) * rx2; l.hy = cy + Math.sin(a) * ry2;
+        const depth = 1 + (j % 2) * 0.20;
+        l.hx = cx + Math.cos(a) * rx2 * depth;
+        l.hy = cy + Math.sin(a) * ry2 * depth;
       });
     });
     const hub = nodeById.co; hub.hx = cx; hub.hy = cy;
-    // seed positions at home the first time
     nodes.forEach(n => { if (n.x === 0 && n.y === 0) { n.x = n.hx; n.y = n.hy; } });
   }
 
@@ -971,6 +994,7 @@ function unshipItem(id) {
     if (!w || !h) return false;
     dpr = Math.min(window.devicePixelRatio || 1, 2);
     W = w; H = h;
+    S = clamp(Math.min(W, H) / 300, 0.82, 1.5);   // scale everything to the box
     canvas.width = W * dpr; canvas.height = H * dpr;
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -978,10 +1002,13 @@ function unshipItem(id) {
     return true;
   }
 
-  const R = { 0: 6.5, 1: 4.6, 2: 3.2 };
-  function nodeR(n) { return R[n.tier] * (1 + n.ex * 0.6); }
+  const R = { 0: 7, 1: 4.8, 2: 3.1 };
+  function nodeR(n) { return R[n.tier] * S * (1 + n.ex * 0.6); }
 
-  function excite(n, amt) { n.ex = clamp(n.ex + amt, 0, 1.4); }
+  function excite(n, amt) {
+    n.ex = clamp(n.ex + amt, 0, 1.4);
+    if (amt >= 0.5) ripples.push({ x: n.x, y: n.y, col: GROUPS[n.group] || '#91d45f', t: 0, r0: nodeR(n) });
+  }
 
   function fireEdge(a, b, delay) { pulses.push({ a: nodeById[a.id ? a.id : a], b: nodeById[b.id ? b.id : b], delay: delay || 0, t: 0, dur: 0.5 + Math.random() * 0.25 }); }
 
@@ -1094,43 +1121,82 @@ function unshipItem(id) {
 
   function draw() {
     ctx.clearRect(0, 0, W, H);
-    // edges
+    const time = performance.now() / 1000;
+
+    // ---- edges: gradient strands, brighter where a node is lit ----
     for (const [aid, bid] of edges) {
       const a = nodeById[aid], b = nodeById[bid];
       const lit = Math.max(a.ex, b.ex);
-      ctx.strokeStyle = `rgba(145, 212, 95, ${0.07 + lit * 0.22})`;
-      ctx.lineWidth = 1;
+      const g = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+      g.addColorStop(0, hexA(GROUPS[a.group] || '#91d45f', 0.05 + a.ex * 0.3 + lit * 0.08));
+      g.addColorStop(1, hexA(GROUPS[b.group] || '#91d45f', 0.05 + b.ex * 0.3 + lit * 0.08));
+      ctx.strokeStyle = g;
+      ctx.lineWidth = (0.8 + lit * 1.2) * S;
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
     }
-    // pulses (thoughts travelling edges)
+
+    // ---- ripples: a ring blooms where you touched ----
+    for (const rp of ripples) {
+      const rr = rp.r0 + rp.t * 42 * S;
+      ctx.strokeStyle = hexA(rp.col, (1 - rp.t) * 0.4);
+      ctx.lineWidth = 1.4 * S;
+      ctx.beginPath(); ctx.arc(rp.x, rp.y, rr, 0, TAU); ctx.stroke();
+    }
+
+    // ---- pulses: a bright thought with a comet trail ----
     for (const s of pulses) {
       if (s.delay > 0) continue;
-      const x = s.a.x + (s.b.x - s.a.x) * s.t, y = s.a.y + (s.b.y - s.a.y) * s.t;
-      const fade = Math.sin(clamp(s.t, 0, 1) * Math.PI);
-      ctx.fillStyle = `rgba(180, 232, 138, ${0.85 * fade})`;
-      ctx.beginPath(); ctx.arc(x, y, 2.4, 0, Math.PI * 2); ctx.fill();
+      const t = clamp(s.t, 0, 1);
+      const x = s.a.x + (s.b.x - s.a.x) * t, y = s.a.y + (s.b.y - s.a.y) * t;
+      const tt = Math.max(0, t - 0.16);
+      const tx = s.a.x + (s.b.x - s.a.x) * tt, ty = s.a.y + (s.b.y - s.a.y) * tt;
+      const fade = Math.sin(t * Math.PI);
+      const tg = ctx.createLinearGradient(tx, ty, x, y);
+      tg.addColorStop(0, hexA('#b4e88a', 0)); tg.addColorStop(1, hexA('#b4e88a', 0.6 * fade));
+      ctx.strokeStyle = tg; ctx.lineWidth = 2 * S;
+      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(x, y); ctx.stroke();
+      const hg = ctx.createRadialGradient(x, y, 0, x, y, 7 * S);
+      hg.addColorStop(0, hexA('#eafbdc', 0.95 * fade)); hg.addColorStop(1, hexA('#91d45f', 0));
+      ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(x, y, 7 * S, 0, TAU); ctx.fill();
     }
-    // nodes + labels
+
+    // ---- nodes: soft halo + luminous core; labels ----
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     for (const n of nodes) {
       const col = GROUPS[n.group] || '#91d45f';
-      const r = nodeR(n);
+      const hub = n.tier === 0;
       const liveWork = n.work && WORK.find(w => w.id === n.work && w.status === 'needs-you');
-      const base = n.tier === 0 ? 0.95 : n.tier === 1 ? 0.7 : 0.42;
-      const alpha = clamp(base + n.ex * 0.5, 0, 1);
-      if (n.ex > 0.02 || liveWork) {
-        ctx.beginPath(); ctx.arc(n.x, n.y, r + 6 + n.ex * 4, 0, Math.PI * 2);
-        ctx.fillStyle = hexA(liveWork ? '#91d45f' : col, 0.10 + n.ex * 0.14); ctx.fill();
-      }
-      ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
-      ctx.fillStyle = hexA(col, alpha); ctx.fill();
-      if (n.tier === 0) { ctx.lineWidth = 1.5; ctx.strokeStyle = hexA('#b4e88a', 0.7); ctx.stroke(); }
+      const breath = liveWork ? 0.5 + 0.5 * Math.sin(time * 2.4 + n.phase) : 0;
+      const r = nodeR(n) * (hub ? 1 + 0.05 * Math.sin(time * 1.6) : 1);
+      const glow = (hub ? 1 : 0) + n.ex + breath;
+
+      // halo
+      const haloR = r + (hub ? 26 : 11) * S + n.ex * 12 * S + breath * 8 * S;
+      const hg = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, haloR);
+      hg.addColorStop(0, hexA(liveWork ? '#91d45f' : col, 0.05 + glow * 0.16));
+      hg.addColorStop(1, hexA(col, 0));
+      ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(n.x, n.y, haloR, 0, TAU); ctx.fill();
+
+      // core (lighter centre for a lit look)
+      const base = hub ? 0.98 : n.tier === 1 ? 0.72 : 0.46;
+      const cg = ctx.createRadialGradient(n.x - r * 0.3, n.y - r * 0.3, 0, n.x, n.y, r);
+      cg.addColorStop(0, hexA(lighten(col), clamp(base + n.ex * 0.5, 0, 1)));
+      cg.addColorStop(1, hexA(col, clamp(base + n.ex * 0.4, 0, 1)));
+      ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, TAU); ctx.fill();
+      if (hub) { ctx.lineWidth = 1.5 * S; ctx.strokeStyle = hexA('#eafbdc', 0.6); ctx.stroke(); }
+
       // label
-      const lAlpha = clamp((n.tier === 0 ? 0.85 : n.tier === 1 ? 0.5 : 0.28) + n.ex * 0.7, 0, 1);
-      ctx.font = `${n.tier === 0 ? 600 : 500} ${n.tier === 0 ? 12 : n.tier === 1 ? 11 : 10}px "Inter Tight", sans-serif`;
+      const lAlpha = clamp((hub ? 0.9 : n.tier === 1 ? 0.55 : 0.3) + n.ex * 0.7 + breath * 0.4, 0, 1);
+      ctx.font = `${hub ? 600 : 500} ${(hub ? 12.5 : n.tier === 1 ? 11 : 10) * clamp(S, 0.9, 1.2)}px "Inter Tight", system-ui, sans-serif`;
       ctx.fillStyle = hexA(n.tier === 2 ? '#c7ccd4' : '#f3f4f6', lAlpha);
-      ctx.fillText(n.label, n.x, n.y + r + 3);
+      ctx.fillText(n.label, n.x, n.y + r + 3 * S);
     }
+  }
+  function lighten(hex) {
+    const h = hex.replace('#', '');
+    const mix = (c) => Math.round(c + (255 - c) * 0.4);
+    const r = mix(parseInt(h.slice(0, 2), 16)), g = mix(parseInt(h.slice(2, 4), 16)), b = mix(parseInt(h.slice(4, 6), 16));
+    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
   }
   function hexA(hex, a) {
     const h = hex.replace('#', '');
@@ -1152,6 +1218,8 @@ function unshipItem(id) {
       if (thoughtClock > 2.6) { thoughtClock = 0; fireThought(); }
       for (const s of pulses) { if (s.delay > 0) { s.delay -= dt; } else { s.t += dt / s.dur; if (s.t >= 0.5 && !s._hit) { s._hit = true; excite(s.b, 0.6); } } }
       pulses = pulses.filter(s => s.t < 1);
+      for (const rp of ripples) rp.t += dt / 0.7;
+      ripples = ripples.filter(rp => rp.t < 1);
     }
     draw();
     raf = requestAnimationFrame(frame);
@@ -1167,7 +1235,11 @@ function unshipItem(id) {
   window.addEventListener('resize', () => { if (resize() && reduceMotion) draw(); });
   document.addEventListener('visibilitychange', () => (document.hidden ? stop() : start()));
   start();
-  window.__brain = { start, stop, fireThought, nodes };
+  window.__brain = {
+    start, stop, fireThought, nodes,
+    // dev: force N settled frames + a draw (preview tab throttles rAF)
+    tickOnce(frames = 1, dt = 1 / 60) { if (!resize()) return; for (let i = 0; i < frames; i++) { if (!reduceMotion) { step(dt); for (const s of pulses) { if (s.delay > 0) s.delay -= dt; else { s.t += dt / s.dur; if (s.t >= 0.5 && !s._hit) { s._hit = true; excite(s.b, 0.6); } } } pulses = pulses.filter(s => s.t < 1); for (const rp of ripples) rp.t += dt / 0.7; ripples = ripples.filter(rp => rp.t < 1); } } draw(); },
+  };
 })();
 
 /* boot */
