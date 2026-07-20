@@ -918,32 +918,32 @@ function unshipItem(id) {
       { id: 'pr', label: 'PR', tier: 1, group: 'pr', parent: 'co' },
       { id: 'sales', label: 'Sales', tier: 1, group: 'sales', parent: 'co' },
       { id: 'ops', label: 'Ops', tier: 1, group: 'ops', parent: 'co' },
-      // marketing
-      { id: 'newsletter', label: 'Newsletter', tier: 2, group: 'marketing', parent: 'marketing', work: 'newsletter' },
-      { id: 'campaigns', label: 'Campaigns', tier: 2, group: 'marketing', parent: 'marketing' },
-      { id: 'seo', label: 'SEO', tier: 2, group: 'marketing', parent: 'marketing' },
-      { id: 'social', label: 'Social', tier: 2, group: 'marketing', parent: 'marketing' },
-      { id: 'content', label: 'Content', tier: 2, group: 'marketing', parent: 'marketing' },
+      // marketing — leaves are live thoughts, not service names
+      { id: 'newsletter', label: 'Founder letter #12', tier: 2, group: 'marketing', parent: 'marketing', work: 'newsletter' },
+      { id: 'campaigns', label: 'Reel: day-one story', tier: 2, group: 'marketing', parent: 'marketing' },
+      { id: 'seo', label: 'Own “fast”, not “cheap”', tier: 2, group: 'marketing', parent: 'marketing' },
+      { id: 'social', label: 'LinkedIn: the pivot', tier: 2, group: 'marketing', parent: 'marketing' },
+      { id: 'content', label: 'Cut demo into shorts', tier: 2, group: 'marketing', parent: 'marketing' },
       // hiring
-      { id: 'candidates', label: 'Candidates', tier: 2, group: 'hiring', parent: 'hiring', work: 'screening' },
-      { id: 'jd', label: 'JD', tier: 2, group: 'hiring', parent: 'hiring', work: 'jd' },
-      { id: 'interviews', label: 'Interviews', tier: 2, group: 'hiring', parent: 'hiring' },
-      { id: 'onboarding', label: 'Onboarding', tier: 2, group: 'hiring', parent: 'hiring' },
+      { id: 'candidates', label: '12 to screen', tier: 2, group: 'hiring', parent: 'hiring', work: 'screening' },
+      { id: 'jd', label: 'Designer before marketer', tier: 2, group: 'hiring', parent: 'hiring', work: 'jd' },
+      { id: 'interviews', label: 'Add a founder round', tier: 2, group: 'hiring', parent: 'hiring' },
+      { id: 'onboarding', label: 'Day-one checklist', tier: 2, group: 'hiring', parent: 'hiring' },
       // pr
-      { id: 'presslist', label: 'Press list', tier: 2, group: 'pr', parent: 'pr', work: 'press' },
-      { id: 'journalists', label: 'Journalists', tier: 2, group: 'pr', parent: 'pr' },
-      { id: 'pitches', label: 'Pitches', tier: 2, group: 'pr', parent: 'pr' },
-      { id: 'coverage', label: 'Coverage', tier: 2, group: 'pr', parent: 'pr' },
+      { id: 'presslist', label: 'Refresh press list', tier: 2, group: 'pr', parent: 'pr', work: 'press' },
+      { id: 'journalists', label: '3 warm reporters', tier: 2, group: 'pr', parent: 'pr' },
+      { id: 'pitches', label: 'Pitch the pivot', tier: 2, group: 'pr', parent: 'pr' },
+      { id: 'coverage', label: 'Chase TechCrunch', tier: 2, group: 'pr', parent: 'pr' },
       // sales
-      { id: 'leads', label: 'Leads', tier: 2, group: 'sales', parent: 'sales', work: 'leads' },
-      { id: 'crm', label: 'CRM', tier: 2, group: 'sales', parent: 'sales', work: 'crm' },
-      { id: 'pipeline', label: 'Pipeline', tier: 2, group: 'sales', parent: 'sales' },
-      { id: 'outreach', label: 'Outreach', tier: 2, group: 'sales', parent: 'sales' },
+      { id: 'leads', label: '7 warm leads waiting', tier: 2, group: 'sales', parent: 'sales', work: 'leads' },
+      { id: 'crm', label: 'Clean the CRM', tier: 2, group: 'sales', parent: 'sales', work: 'crm' },
+      { id: 'pipeline', label: 'Push referrals next', tier: 2, group: 'sales', parent: 'sales' },
+      { id: 'outreach', label: 'Call churned users', tier: 2, group: 'sales', parent: 'sales' },
       // ops
-      { id: 'calendar', label: 'Calendar', tier: 2, group: 'ops', parent: 'ops' },
-      { id: 'docs', label: 'Docs', tier: 2, group: 'ops', parent: 'ops' },
-      { id: 'finance', label: 'Finance', tier: 2, group: 'ops', parent: 'ops' },
-      { id: 'vendors', label: 'Vendors', tier: 2, group: 'ops', parent: 'ops' },
+      { id: 'calendar', label: 'Deep-work Fridays', tier: 2, group: 'ops', parent: 'ops' },
+      { id: 'docs', label: 'Pricing memo', tier: 2, group: 'ops', parent: 'ops' },
+      { id: 'finance', label: 'Test annual pricing', tier: 2, group: 'ops', parent: 'ops' },
+      { id: 'vendors', label: 'Cut hosting cost', tier: 2, group: 'ops', parent: 'ops' },
     ],
     // cross-links weave the tree into a web
     cross: [
@@ -998,6 +998,12 @@ function unshipItem(id) {
     canvas.width = W * dpr; canvas.height = H * dpr;
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // cache label widths at this scale — draw() clamps text onto the canvas
+    for (const n of nodes) {
+      const hub = n.tier === 0;
+      ctx.font = `${hub ? 600 : 500} ${(hub ? 12.5 : n.tier === 1 ? 11 : 10) * clamp(S, 0.9, 1.2)}px "Inter Tight", system-ui, sans-serif`;
+      n.lw = ctx.measureText(n.label).width;
+    }
     layout();
     return true;
   }
@@ -1185,11 +1191,14 @@ function unshipItem(id) {
       ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, TAU); ctx.fill();
       if (hub) { ctx.lineWidth = 1.5 * S; ctx.strokeStyle = hexA('#eafbdc', 0.6); ctx.stroke(); }
 
-      // label
-      const lAlpha = clamp((hub ? 0.9 : n.tier === 1 ? 0.55 : 0.3) + n.ex * 0.7 + breath * 0.4, 0, 1);
+      // label — on small boxes resting leaf labels would collide, so they
+      // only surface while the node is lit (a thought fired / touch)
+      const rest = hub ? 0.9 : n.tier === 1 ? 0.55 : (W < 420 ? 0 : 0.3);
+      const lAlpha = clamp(rest + n.ex * 0.7 + breath * 0.4, 0, 1);
       ctx.font = `${hub ? 600 : 500} ${(hub ? 12.5 : n.tier === 1 ? 11 : 10) * clamp(S, 0.9, 1.2)}px "Inter Tight", system-ui, sans-serif`;
       ctx.fillStyle = hexA(n.tier === 2 ? '#c7ccd4' : '#f3f4f6', lAlpha);
-      ctx.fillText(n.label, n.x, n.y + r + 3 * S);
+      const lx = clamp(n.x, (n.lw || 0) / 2 + 4, W - (n.lw || 0) / 2 - 4);
+      ctx.fillText(n.label, lx, n.y + r + 3 * S);
     }
   }
   function lighten(hex) {
@@ -1233,6 +1242,8 @@ function unshipItem(id) {
   function stop() { cancelAnimationFrame(raf); raf = 0; }
 
   window.addEventListener('resize', () => { if (resize() && reduceMotion) draw(); });
+  // label widths were measured before the webfont arrived — measure again
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (resize() && reduceMotion) draw(); });
   document.addEventListener('visibilitychange', () => (document.hidden ? stop() : start()));
   start();
   window.__brain = {
