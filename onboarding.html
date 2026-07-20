@@ -7,7 +7,7 @@
   <meta name="description" content="Meet Allya — a short conversation with your AI cofounder. Watch your company brain build itself as you answer." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,380..560&family=Inter+Tight:wght@400;450;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,380..520&family=Inter+Tight:wght@400;450;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="onboarding.css" />
 </head>
@@ -42,24 +42,31 @@
     <div class="ob-ask-grid">
       <!-- left: the conversation -->
       <div class="ob-q-col">
-        <div class="ob-q-inner" id="qInner">
-          <div class="ob-step-tag" id="stepTag">First things first</div>
-          <div class="ob-ask-who">
-            <span class="avatar">A</span>
-            <span class="ob-ask-name">Allya <span class="ob-ask-role">· your cofounder</span></span>
-          </div>
-          <p class="ob-question" id="questionText">Hi — I'm Allya. Before we begin, what should I call your company?</p>
+        <div class="ob-chat-head">
+          <span class="avatar">A</span>
+          <span class="ob-ask-name">Allya <span class="ob-ask-role">· your cofounder</span></span>
+        </div>
 
-          <div class="ob-answer" id="answerZone">
-            <!-- input injected here -->
-          </div>
+        <div class="ob-thread" id="obThread">
+          <div id="thread"></div>
+        </div>
 
-          <div class="ob-actions">
-            <button class="cta ob-continue" id="continueBtn" disabled>Continue
-              <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M4 12h15M13 6l6 6-6 6" stroke="#0a0a0a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="composer ob-composer" id="obComposer">
+          <div class="ob-attachments" id="attachRow" hidden></div>
+          <div class="field">
+            <textarea id="composerInput" rows="1" autocomplete="off" spellcheck="true" placeholder="Your company name"></textarea>
+            <button class="ob-icon" id="attachBtn" type="button" title="Attach a document" aria-label="Attach a document">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M21 11.5l-8.6 8.6a5 5 0 01-7.1-7.1l9-9a3.5 3.5 0 014.9 4.9l-9 9a2 2 0 01-2.8-2.8l8.1-8.1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
-            <span class="ob-hint" id="continueHint">press Enter</span>
+            <button class="ob-icon" id="voiceBtn" type="button" title="Answer with your voice" aria-label="Answer with your voice">
+              <svg viewBox="0 0 24 24" fill="none"><rect x="9" y="2.5" width="6" height="11.5" rx="3" stroke="currentColor" stroke-width="1.7"/><path d="M5.5 11.5a6.5 6.5 0 0013 0M12 18v3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+            </button>
+            <button class="send" id="sendBtn" type="button" aria-label="Send">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M4 12h15M13 6l6 6-6 6" stroke="#0a0a0a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
           </div>
+          <p class="ob-composer-hint" id="composerHint"><kbd>Enter</kbd> to send</p>
+          <input type="file" id="fileInput" hidden multiple accept=".pdf,.doc,.docx,.txt,.md,.ppt,.pptx,.csv,.png,.jpg,.jpeg" />
         </div>
       </div>
 

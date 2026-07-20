@@ -351,12 +351,18 @@ const QUESTIONS = [
     q: 'Tell me about your business — what do you do, and who is it for? Say as much as you like; detail makes me sharper.',
     type: 'long', placeholder: 'e.g. We build a scheduling tool for independent salons — booking, reminders, and payments in one app…',
     example: 'We run a D2C coffee brand selling single-origin beans by subscription, plus wholesale to cafés.',
+    ack: () => "That's a clear picture. I'm mapping it now — watch it take shape on the right.",
     cluster: () => ({ id: 'business', label: 'Business', group: 'marketing',
       leaves: ['Marketing', 'Sales', 'Hiring', 'PR', 'Ops'] }) },
 
   { key: 'market', tag: 'Your market', sub: 'Placing you in your market',
     q: 'Who do you sell to — other businesses, everyday consumers, or both?',
     type: 'choice', options: ['Businesses', 'Consumers', 'Both'],
+    ack: (a) => a === 'Businesses'
+      ? 'Businesses it is. That changes who I chase and how I write to them.'
+      : a === 'Consumers'
+        ? 'Consumers — so volume and voice matter more than long sales cycles. Noted.'
+        : "Both, then. I'll keep two tones ready — they don't respond to the same things.",
     cluster: (a) => ({ id: 'market', label: 'Market', group: 'market',
       leaves: [a === 'Businesses' ? 'B2B' : a === 'Consumers' ? 'B2C' : 'B2B + B2C'] }) },
 
@@ -364,6 +370,7 @@ const QUESTIONS = [
     q: 'In one line — who is your ideal customer?',
     type: 'short', placeholder: 'e.g. Seed-stage SaaS founders with a small team and no marketing hire',
     example: 'Busy salon owners running 2–5 chairs who hate admin.',
+    ack: () => "Good — knowing exactly who we're for saves us both a lot of wasted work.",
     cluster: (a) => ({ id: 'customer', label: 'Customer', group: 'customer',
       leaves: splitLeaves(a, 2) }) },
 
@@ -371,6 +378,7 @@ const QUESTIONS = [
     q: "Roughly, what's your monthly revenue right now? A range is completely fine.",
     type: 'short', placeholder: 'e.g. around ₹3–4L / month, mostly subscriptions',
     example: 'About $8k MRR, growing ~10% month over month.',
+    ack: () => 'Thank you. That tells me what to push on now and what can wait.',
     cluster: (a) => ({ id: 'revenue', label: 'Revenue', group: 'revenue',
       leaves: [revenueStage(a).badge] }) },
 
@@ -378,6 +386,12 @@ const QUESTIONS = [
     q: 'What are your top 3 objectives for the next 6–12 months?',
     type: 'long', placeholder: '1. Hit ₹10L MRR\n2. Hire an ops lead\n3. Launch in two new cities',
     example: '1. Double paying customers\n2. Hire a first salesperson\n3. Get press in two industry outlets',
+    ack: (a) => {
+      const n = splitGoals(a).length;
+      return n > 1
+        ? `${n} things to aim at. I'll keep bringing us back to these.`
+        : "That's the one to aim at. I'll keep bringing us back to it.";
+    },
     cluster: (a) => ({ id: 'goals', label: 'Goals', group: 'goals',
       leaves: splitGoals(a).map(shortLabel) }) },
 
@@ -385,6 +399,7 @@ const QUESTIONS = [
     q: 'Last one — what makes you different from your competitors?',
     type: 'long', placeholder: 'e.g. We are the only one that does same-day setup, and our support is human, not a bot…',
     example: "We're the only one built for solo operators — everyone else targets big teams.",
+    ack: () => "That's everything I need. Give me a moment — I'm putting your company together.",
     cluster: (a) => ({ id: 'edge', label: 'Edge', group: 'edge',
       leaves: [shortLabel(a)] }) },
 ];
@@ -414,130 +429,312 @@ function beginAsk() {
   brain = makeBrain(el('obCanvas'), el('brainBox'));
   window.__obBrain = brain;        // debug handle, mirrors the workspace's window.__brain
   brain.seedHub('Your company');   // self-retries via rAF until the box is sized
-  renderStep();                    // flow does NOT wait on rAF
+  askStep();                       // flow does NOT wait on rAF
 }
 
-const qInner = el('qInner'), answerZone = el('answerZone'), continueBtn = el('continueBtn'),
-  continueHint = el('continueHint'), stepTag = el('stepTag'), questionText = el('questionText'),
-  brainSub = el('brainSub'), ledger = el('ledger'), progressBar = el('progressBar');
-pressable(continueBtn, 0.96);
+const thread = el('thread'), threadScroll = el('obThread'), brainSub = el('brainSub'),
+  ledger = el('ledger'), progressBar = el('progressBar'),
+  composerEl = el('obComposer'), field = el('composerInput'), sendBtn = el('sendBtn'),
+  composerHint = el('composerHint'), attachBtn = el('attachBtn'), voiceBtn = el('voiceBtn'),
+  fileInput = el('fileInput'), attachRow = el('attachRow');
+pressable(sendBtn, 0.9);
 
-let currentValue = '', canContinue = false;
-function setContinue(ok) { canContinue = ok; continueBtn.disabled = !ok; }
+let lastSpeaker = null;      // spaces messages when the speaker changes
+let pendingChips = null;     // the live one-shot chip row, if any
+let awaitingAnswer = false;  // false while Allya is "thinking"
+let mode = 'text';           // 'text' | 'choice' — what the current step accepts
+let pendingFiles = [];       // attachments staged for the next answer
+const attachments = {};      // { [stepKey]: [filename, …] } — never mixed into answers
 
-function renderStep() {
-  // name step first
+/* ---- transcript primitives (the workspace's, ported) ---- */
+function scrollThread() {
+  // near-bottom only, so reading back through earlier answers isn't yanked
+  // away when the next question lands. setTimeout, not rAF — a throttled
+  // tab must never strand the flow.
+  const near = threadScroll.scrollHeight - threadScroll.scrollTop - threadScroll.clientHeight < 80;
+  if (!near) return;
+  setTimeout(() => {
+    threadScroll.scrollTo({ top: threadScroll.scrollHeight, behavior: reduceMotion ? 'auto' : 'smooth' });
+  }, 0);
+}
+
+function addMsg(speaker, html, opts = {}) {
+  const row = document.createElement('div');
+  row.className = 'msg ' + (speaker === 'you' ? 'from-you' : '');
+  if (lastSpeaker && lastSpeaker !== speaker) row.classList.add('change');
+  lastSpeaker = speaker;
+
+  const block = document.createElement('div');
+  block.className = 'msg-block';
+  if (opts.tag) {
+    const t = document.createElement('div'); t.className = 'speaker';
+    t.innerHTML = opts.tag; block.appendChild(t);
+  }
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble ' + speaker;
+  bubble.innerHTML = html;
+  block.appendChild(bubble);
+  row.appendChild(block);
+  thread.appendChild(row);
+
+  if (!reduceMotion) {
+    const dy = 10;
+    bubble.style.opacity = 0; bubble.style.transform = `translateY(${dy}px)`;
+    new Spring(0, { response: 0.4, damping: 0.85, onframe: (p, v, settled) => {
+      bubble.style.opacity = p; bubble.style.transform = `translateY(${dy * (1 - p)}px)`;
+      if (settled) { bubble.style.transform = ''; bubble.style.opacity = ''; }
+    }}).to(1);
+  }
+  scrollThread();
+  return row;
+}
+
+function obTyping(then, delay = 900) {
+  const row = document.createElement('div');
+  row.className = 'msg change';
+  row.innerHTML = '<div class="msg-block"><div class="bubble allya typing" aria-label="Allya is thinking"><i></i><i></i><i></i></div></div>';
+  thread.appendChild(row); scrollThread();
+  setTimeout(() => { row.remove(); then(); }, reduceMotion ? 200 : delay);
+}
+
+function obChips(list) {
+  clearChips();
+  const wrap = document.createElement('div'); wrap.className = 'chips';
+  list.forEach(c => {
+    const b = document.createElement('button'); b.className = 'chip'; b.type = 'button'; b.textContent = c.label;
+    pressable(b, 0.94);
+    b.addEventListener('click', () => { clearChips(); c.act(); });   // one-shot
+    wrap.appendChild(b);
+  });
+  thread.appendChild(wrap); scrollThread();
+  pendingChips = wrap;
+}
+function clearChips() { if (pendingChips) { pendingChips.remove(); pendingChips = null; } }
+
+/* ---- asking ---- */
+function setProgress() {
+  progressBar.style.width = `${((idx + 1) / (QUESTIONS.length + 1)) * 100}%`;
+}
+
+function askStep() {
   if (idx === -1) {
-    stepTag.innerHTML = 'First things first';
-    questionText.textContent = "Hi — I'm Allya, and I'll be running the parts of your company you don't have time for. Before we begin: what's your company called?";
     brainSub.textContent = 'waiting for a name…';
-    buildInput({ type: 'short', placeholder: 'Your company name' });
-    continueHint.innerHTML = 'press <kbd>Enter</kbd>';
-    animateQuestionIn();
+    setProgress();
+    addMsg('allya', escapeHtml("Hi — I'm Allya, and I'll be running the parts of your company you don't have time for. Before we begin: what's your company called?"), { tag: 'First things first' });
+    setComposerMode({ type: 'short', placeholder: 'Your company name' });
     return;
   }
   const step = QUESTIONS[idx];
-  stepTag.innerHTML = `<b>Q${idx + 1}</b> / 6 · ${step.tag}`;
-  questionText.textContent = step.q;
   brainSub.textContent = 'building as you talk…';
-  buildInput(step);
-  continueHint.innerHTML = step.type === 'long' ? 'press <kbd>Enter</kbd> for a new line' : 'press <kbd>Enter</kbd>';
-  animateQuestionIn();
-}
-
-function animateQuestionIn() {
-  progressBar.style.width = `${((idx + 1) / (QUESTIONS.length + 1)) * 100}%`;
-  riseIn(qInner, 14);
-}
-
-function buildInput(step) {
-  currentValue = ''; setContinue(false);
-  answerZone.innerHTML = '';
+  setProgress();
+  addMsg('allya', escapeHtml(step.q), { tag: `<b>Q${idx + 1}</b> / 6 · ${step.tag}` });
 
   if (step.type === 'choice') {
-    const wrap = document.createElement('div'); wrap.className = 'ob-choices';
-    step.options.forEach(opt => {
-      const b = document.createElement('button'); b.className = 'ob-choice'; b.type = 'button'; b.textContent = opt;
-      pressable(b, 0.96);
-      b.addEventListener('click', () => {
-        wrap.querySelectorAll('.ob-choice').forEach(x => x.classList.toggle('selected', x === b));
-        currentValue = opt; setContinue(true);
-        setTimeout(commit, 360);      // decisive: auto-advance
-      });
-      wrap.appendChild(b);
-    });
-    answerZone.appendChild(wrap);
-    return;
+    obChips(step.options.map(o => ({ label: o, act: () => submitAnswer(o) })));
+  } else if (step.example) {
+    obChips([{ label: 'Show me an example', act: () => {
+      field.value = step.example; autoGrow(field, 132); field.focus();
+    } }]);
   }
-
-  const field = document.createElement(step.type === 'long' ? 'textarea' : 'input');
-  field.className = 'ob-field';
-  if (step.type !== 'long') field.type = 'text';
-  field.placeholder = step.placeholder || '';
-  field.autocomplete = 'off'; field.spellcheck = true;
-  field.addEventListener('input', () => {
-    currentValue = field.value;
-    if (step.type === 'long') autoGrow(field);
-    setContinue(field.value.trim().length > 0);
-  });
-  field.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && (step.type !== 'long' || (e.metaKey || e.ctrlKey))) { e.preventDefault(); if (canContinue) commit(); }
-  });
-  answerZone.appendChild(field);
-
-  if (step.example) {
-    const ex = document.createElement('button'); ex.className = 'ob-example'; ex.type = 'button';
-    ex.innerHTML = `<svg viewBox="0 0 24 24" fill="none"><path d="M12 3v2M12 19v2M5 12H3M21 12h-2M6 6l1.5 1.5M18 18l-1.5-1.5M6 18l1.5-1.5M18 6l-1.5 1.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="12" r="3.4" stroke="currentColor" stroke-width="1.6"/></svg> Show me an example`;
-    ex.addEventListener('click', () => {
-      field.value = step.example; currentValue = step.example;
-      if (step.type === 'long') autoGrow(field);
-      setContinue(true); field.focus();
-    });
-    answerZone.appendChild(ex);
-  }
-  setTimeout(() => field.focus(), reduceMotion ? 0 : 260);
+  setComposerMode(step);
 }
 
-function autoGrow(t) { t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 260) + 'px'; }
+function setComposerMode(step) {
+  mode = step.type === 'choice' ? 'choice' : 'text';
+  const choice = mode === 'choice';
+  // readOnly rather than disabled: disabled blurs the field, which on mobile
+  // dismisses the keyboard and re-pops it on the next step
+  field.readOnly = choice;
+  composerEl.classList.toggle('is-locked', choice);
+  field.placeholder = choice ? 'Pick one above' : (step.placeholder || '');
+  field.value = ''; autoGrow(field, 132);
+  composerHint.innerHTML = choice
+    ? 'Pick an option above'
+    : '<kbd>Enter</kbd> to send · <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new line';
+  awaitingAnswer = true;
+  setTimeout(() => { if (!choice) field.focus(); }, reduceMotion ? 0 : 240);
+}
 
-continueBtn.addEventListener('click', () => { if (canContinue) commit(); });
+function autoGrow(t, max = 260) { t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, max) + 'px'; }
 
-function commit() {
-  if (!canContinue) return;
-  const val = currentValue.trim();
+/* ---- answering ---- */
+function trySubmit() {
+  if (!awaitingAnswer || mode !== 'text') return;
+  const val = field.value.trim();
+  if (!val) return;
+  submitAnswer(val);
+}
+sendBtn.addEventListener('click', trySubmit);
+field.addEventListener('input', () => autoGrow(field, 132));
+field.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  if (e.shiftKey) return;                       // newline
+  e.preventDefault();                           // Enter (and ⌘/Ctrl+Enter) send
+  trySubmit();
+});
 
+function submitAnswer(val) {
+  if (!awaitingAnswer) return;                  // no double-submit mid-thought
+  awaitingAnswer = false;
+  clearChips();
+
+  const files = pendingFiles.slice();
+  const fileLine = files.length
+    ? `<span class="ob-sent-file"><svg viewBox="0 0 24 24" fill="none" width="12" height="12"><path d="M21 11.5l-8.6 8.6a5 5 0 01-7.1-7.1l9-9a3.5 3.5 0 014.9 4.9l-9 9a2 2 0 01-2.8-2.8l8.1-8.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> ${escapeHtml(files.map(f => f.name).join(', '))}</span>`
+    : '';
+  addMsg('you', escapeHtml(val).replace(/\n/g, '<br>') + fileLine);
+  field.value = ''; autoGrow(field, 132);
+  clearFiles();
+  stopVoice();
+
+  setTimeout(() => afterAnswer(val, files), 240);
+}
+
+function afterAnswer(val, files) {
+  // name step
   if (idx === -1) {
     companyName = val; answers.company = val;
+    if (files.length) attachments.company = files.map(f => f.name);
     brain.setHubLabel(val); brain.fireThought();
     idx = 0;
-    transitionStep(() => renderStep());
+    const hello = ackFor({ ack: () => `Lovely — ${val} it is. Let me start its brain.` }, val, files);
+    obTyping(() => {
+      addMsg('allya', escapeHtml(hello));
+      obTyping(() => askStep(), 760);
+    }, 700);
     return;
   }
 
   const step = QUESTIONS[idx];
   answers[step.key] = val;
+  if (files.length) attachments[step.key] = files.map(f => f.name);
   // grow the brain for this answer, update the live status, log it
   brainSub.textContent = step.sub;
   brain.grow(step.cluster(val));
   addLedger(step);
 
-  if (idx >= QUESTIONS.length - 1) {
-    setTimeout(runSynthesis, 720);
+  const last = idx >= QUESTIONS.length - 1;
+  const ack = ackFor(step, val, files);
+
+  if (last) {
+    obTyping(() => {
+      addMsg('allya', escapeHtml(ack));
+      setTimeout(runSynthesis, 720);
+    }, 800);
     return;
   }
   idx++;
-  transitionStep(() => renderStep());
+  obTyping(() => {
+    addMsg('allya', escapeHtml(ack));
+    obTyping(() => askStep(), 760);
+  }, 700);
 }
 
-function transitionStep(then) {
-  setContinue(false);
-  if (reduceMotion) { then(); return; }
-  // fade the current question out with a CSS transition, then render the
-  // next one — timeout-driven so it never strands on a throttled tab
-  qInner.style.transition = 'opacity .18s ease, transform .18s ease';
-  qInner.style.opacity = '0';
-  qInner.style.transform = 'translateY(-12px)';
-  setTimeout(() => { qInner.style.transition = ''; qInner.style.transform = ''; then(); }, 200);
+/* Allya reacts to what was actually said — never the same "Got it" six
+   times over, which is what makes a scripted flow feel like a form. */
+function ackFor(step, val, files) {
+  let line = typeof step.ack === 'function' ? step.ack(val) : 'Noted.';
+  if (files && files.length) {
+    line += files.length === 1
+      ? ` And thanks for ${files[0].name} — I'll read it.`
+      : ` And thanks for those ${files.length} files — I'll read them.`;
+  }
+  return line;
+}
+
+/* ---- documents: staged as pills, recorded by filename only. Contents are
+   deliberately not parsed — folding raw file text into the answer would
+   pollute splitGoals/shortLabel/derive, which read answers[key] directly. */
+attachBtn.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => {
+  Array.from(fileInput.files || []).forEach(f => {
+    if (!pendingFiles.some(p => p.name === f.name && p.size === f.size)) {
+      pendingFiles.push({ name: f.name, size: f.size });
+    }
+  });
+  fileInput.value = '';       // so re-picking the same file fires change again
+  renderFiles();
+});
+
+function renderFiles() {
+  attachRow.innerHTML = '';
+  attachRow.hidden = pendingFiles.length === 0;
+  pendingFiles.forEach((f, i) => {
+    const pill = document.createElement('span'); pill.className = 'ob-attach-pill';
+    pill.innerHTML = `<span class="ap-name">${escapeHtml(f.name)}</span><span class="ap-size">${fileSize(f.size)}</span>`;
+    const x = document.createElement('button');
+    x.className = 'ap-x'; x.type = 'button'; x.innerHTML = '&times;';
+    x.setAttribute('aria-label', `Remove ${f.name}`);
+    x.addEventListener('click', () => { pendingFiles.splice(i, 1); renderFiles(); });
+    pill.appendChild(x);
+    attachRow.appendChild(pill);
+  });
+}
+function clearFiles() { pendingFiles = []; renderFiles(); }
+function fileSize(b) { return b < 1024 ? `${b} B` : b < 1048576 ? `${Math.round(b / 1024)} KB` : `${(b / 1048576).toFixed(1)} MB`; }
+
+/* ---- voice: the browser's own SpeechRecognition, dictating into the
+   field. It never auto-submits — you read it back and press Enter. */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, recording = false, baseText = '';
+
+if (!SR) {
+  voiceBtn.hidden = true;     // a dead control is worse than no control
+} else {
+  voiceBtn.addEventListener('click', () => recording ? stopVoice() : startVoice());
+}
+
+function startVoice() {
+  if (!SR || recording || mode === 'choice') return;
+  rec = new SR();
+  rec.continuous = true; rec.interimResults = true;
+  rec.lang = navigator.language || 'en-US';
+  baseText = field.value ? field.value.replace(/\s*$/, ' ') : '';
+
+  rec.onresult = (e) => {
+    let text = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) text += e.results[i][0].transcript;
+    field.value = baseText + text;
+    autoGrow(field, 132);
+    if (e.results[e.results.length - 1].isFinal) baseText = field.value.replace(/\s*$/, ' ');
+  };
+  rec.onerror = (e) => {
+    stopVoice();
+    const msg = e.error === 'not-allowed' || e.error === 'service-not-allowed'
+      ? 'Voice needs mic access — type instead'
+      : 'Voice didn\'t catch that — type instead';
+    flashHint(msg);
+  };
+  rec.onend = () => stopVoice();
+
+  try { rec.start(); } catch { return; }
+  recording = true;
+  voiceBtn.classList.add('is-live');
+  voiceBtn.title = 'Stop recording';
+  flashHint('Listening — press the mic again to stop', 0);
+}
+
+function stopVoice() {
+  if (rec) { rec.onend = null; try { rec.stop(); } catch {} rec = null; }
+  if (!recording) return;
+  recording = false;
+  voiceBtn.classList.remove('is-live');
+  voiceBtn.title = 'Answer with your voice';
+  restoreHint();
+  field.focus();
+}
+
+let hintTimer = 0;
+function flashHint(msg, revertAfter = 3200) {
+  clearTimeout(hintTimer);
+  composerHint.textContent = msg;
+  if (revertAfter) hintTimer = setTimeout(restoreHint, revertAfter);
+}
+function restoreHint() {
+  clearTimeout(hintTimer);
+  composerHint.innerHTML = mode === 'choice'
+    ? 'Pick an option above'
+    : '<kbd>Enter</kbd> to send · <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new line';
 }
 
 function addLedger(step) {
@@ -817,7 +1014,7 @@ function saveHandoff(d) {
     localStorage.setItem('allya.onboarding', JSON.stringify({
       company: d.companyName, base: d.baseSeg, category: d.category, oneWord: d.oneWord,
       customer: d.customer.text, revenueBadge: d.rev.badge, goals: d.goalList,
-      pitch: d.pitch, edge: d.edge, answers, at: Date.now(),
+      pitch: d.pitch, edge: d.edge, answers, attachments, at: Date.now(),
     }));
   } catch (e) { /* private mode — non-fatal */ }
 }

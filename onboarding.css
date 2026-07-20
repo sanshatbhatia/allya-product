@@ -71,7 +71,9 @@
 /* ============================================================
    2 · Ask — question column + brain column
    ============================================================ */
-.ob-ask { flex-direction: column; overflow: hidden; }
+/* 100dvh so a mobile soft keyboard shrinks the layer instead of
+   overlaying the composer (.ob-screen is fixed to the layout viewport) */
+.ob-ask { flex-direction: column; overflow: hidden; height: 100dvh; }
 
 .ob-progress { flex: none; height: 2px; background: rgba(255,255,255,0.06); position: relative; z-index: 5; }
 .ob-progress-bar {
@@ -87,75 +89,85 @@
   width: 100%; max-width: 1200px; margin: 0 auto;
 }
 
-/* left — the question */
+/* left — the conversation. A flex column: identity header, scrolling
+   transcript, composer. min-height:0 is load-bearing — without it the
+   transcript's content height wins, the grid row overflows, and that
+   stretches the brain column too (a wrong-sized canvas, not just a
+   broken chat). */
 .ob-q-col {
-  display: flex; align-items: center;
-  padding: 40px clamp(28px, 5vw, 68px) 40px;
+  display: flex; flex-direction: column;
+  min-width: 0; min-height: 0; overflow: hidden;
   border-right: 1px solid var(--hairline);
-  min-width: 0;
 }
-.ob-q-inner { width: 100%; max-width: 480px; will-change: opacity, transform; }
-.ob-step-tag {
-  font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
-  color: var(--fg-faint); margin-bottom: 20px;
+
+.ob-chat-head {
+  flex: none;
+  display: flex; align-items: center; gap: 9px;
+  padding: 15px clamp(20px, 3.4vw, 40px);
+  border-bottom: 1px solid var(--hairline);
 }
-.ob-step-tag b { color: var(--lime); font-weight: 600; }
-.ob-ask-who { display: flex; align-items: center; gap: 9px; margin-bottom: 14px; }
 .ob-ask-name { font-size: 12.5px; font-weight: 500; color: var(--fg); }
 .ob-ask-role { color: var(--fg-faint); font-weight: 400; }
-.ob-question {
-  font-family: var(--serif); font-optical-sizing: auto; font-weight: 440;
-  font-size: clamp(22px, 3vw, 30px); line-height: 1.25; letter-spacing: -0.01em;
-  color: var(--fg); margin: 0 0 24px; text-wrap: pretty;
-}
 
-/* the answer input */
-.ob-answer { margin-bottom: 22px; }
-.ob-field {
-  width: 100%;
+.ob-thread {
+  flex: 1; min-height: 0;
+  overflow-y: auto;
+  padding: 20px clamp(20px, 3.4vw, 40px) 12px;
+}
+/* the step counter, riding in addMsg's .speaker row */
+.ob-thread .speaker b { color: var(--lime); font-weight: 600; }
+
+/* composer — .composer/.field/.send come from styles.css; these are the
+   deltas for a growing textarea and the two extra controls */
+.ob-composer .field { align-items: flex-end; }
+.ob-composer textarea {
+  flex: 1; border: none; outline: none; background: transparent;
+  font-family: var(--sans); font-size: 14px; line-height: 1.5; color: var(--fg);
+  padding: 9px 0;
+  resize: none; max-height: 132px; overflow-y: auto;
+}
+.ob-composer textarea::placeholder { color: var(--fg-faint); }
+.ob-composer.is-locked .field { opacity: 0.55; }
+
+.ob-icon {
+  flex: none; width: 34px; height: 34px; border-radius: 8px;
+  appearance: none; border: none; cursor: pointer; background: transparent;
+  color: var(--fg-faint);
+  display: grid; place-items: center;
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
+  will-change: transform; touch-action: manipulation;
+}
+.ob-icon:hover { color: var(--fg-soft); background: var(--raised); }
+.ob-icon svg { width: 17px; height: 17px; }
+.ob-icon.is-live { color: var(--lime); background: var(--lime-dim); animation: pulse 1.6s var(--ease) infinite; }
+
+.ob-attachments { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 8px; }
+.ob-attach-pill {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12px; color: var(--fg-soft);
   background: var(--surface);
   border: 1px solid var(--hairline-strong);
-  border-radius: 14px;
-  color: var(--fg);
-  font-family: var(--sans); font-size: 15.5px; line-height: 1.55;
-  padding: 15px 16px;
-  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
-  resize: none; outline: none;
+  border-radius: 999px;
+  padding: 5px 6px 5px 11px;
+  max-width: 100%;
 }
-.ob-field::placeholder { color: var(--fg-faint); }
-.ob-field:focus { border-color: var(--lime); box-shadow: 0 0 0 3px var(--lime-dim); }
-textarea.ob-field { min-height: 128px; }
-
-.ob-example {
-  display: inline-flex; align-items: center; gap: 6px;
-  margin-top: 12px; cursor: pointer;
-  appearance: none; background: none; border: none;
-  font-size: 12.5px; color: var(--fg-faint); font-family: var(--sans);
+.ob-attach-pill .ap-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 190px; }
+.ob-attach-pill .ap-size { color: var(--fg-faint); flex: none; }
+.ob-attach-pill .ap-x {
+  appearance: none; border: none; background: none; cursor: pointer;
+  color: var(--fg-faint); font-size: 15px; line-height: 1;
+  padding: 0 4px; flex: none;
 }
-.ob-example:hover { color: var(--lime-glow); }
-.ob-example svg { width: 13px; height: 13px; }
+.ob-attach-pill .ap-x:hover { color: var(--danger); }
 
-/* choice chips */
-.ob-choices { display: flex; flex-wrap: wrap; gap: 10px; }
-.ob-choice {
-  appearance: none; cursor: pointer;
-  font-family: var(--serif); font-optical-sizing: auto; font-weight: 430; font-size: 16px;
-  color: var(--fg);
-  background: var(--surface);
-  border: 1px solid var(--hairline-strong);
-  border-radius: 13px;
-  padding: 14px 20px;
-  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), transform var(--dur) var(--ease);
-  will-change: transform;
+/* the paperclip line inside a sent bubble */
+.bubble .ob-sent-file {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 6px; font-family: var(--sans); font-size: 12px; opacity: 0.72;
 }
-.ob-choice:hover { background: var(--raised); border-color: var(--hairline-strong); }
-.ob-choice.selected { background: var(--lime-dim); border-color: var(--lime); color: var(--lime-glow); }
 
-.ob-actions { display: flex; align-items: center; gap: 14px; }
-.ob-continue { font-size: 14px; }
-.ob-continue:disabled { opacity: 0.4; cursor: default; }
-.ob-hint { font-size: 12px; color: var(--fg-faint); }
-.ob-hint kbd {
+.ob-composer-hint { font-size: 12px; color: var(--fg-faint); margin: 8px 2px 0; }
+.ob-composer-hint kbd {
   font-family: var(--sans); font-size: 11px;
   border: 1px solid var(--hairline); border-radius: 4px; padding: 1px 5px;
   background: var(--surface); color: var(--fg-soft);
@@ -343,9 +355,14 @@ textarea.ob-field { min-height: 128px; }
    Mobile
    ============================================================ */
 @media (max-width: 880px) {
-  .ob-ask-grid { grid-template-columns: 1fr; grid-template-rows: minmax(240px, 42vh) 1fr; }
+  /* a scrolling transcript AND a composer now share the bottom row,
+     so the brain gets a smaller (still non-zero) box */
+  .ob-ask-grid { grid-template-columns: 1fr; grid-template-rows: minmax(180px, 34vh) 1fr; }
   .ob-brain-col { order: -1; padding: 12px 12px 0; }
-  .ob-q-col { border-right: none; border-top: 1px solid var(--hairline); padding: 24px 22px 28px; align-items: flex-start; }
+  .ob-q-col { border-right: none; border-top: 1px solid var(--hairline); }
+  .ob-chat-head { padding: 12px 16px; }
+  .ob-thread { padding: 16px 16px 8px; }
+  .ob-composer { padding: 8px 16px 14px; }
   .ob-brain-box { border-radius: 16px; }
   .ob-ledger { display: none; }
 
