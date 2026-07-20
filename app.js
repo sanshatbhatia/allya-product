@@ -888,6 +888,144 @@ function unshipItem(id) {
 })();
 
 /* ============================================================
+   Dot pages — every node in the brain is a place you can go.
+   Tapping a dot re-centres the brain on it, fogs the rest, floods
+   the page with that dot's colour and grows its page out of the
+   node itself. Closing reverses the whole move. Same document, so
+   the transition is continuous — the brain is never torn down.
+   ============================================================ */
+const DEPT_COPY = {
+  marketing: { blurb: 'How the market hears about you. Campaigns, content, and the story you keep telling.' },
+  hiring:    { blurb: 'Who joins, in what order, and what you promise them on day one.' },
+  pr:        { blurb: 'Who writes about you, and why now. Relationships before pitches.' },
+  sales:     { blurb: 'Where revenue actually comes from this month — not the theory of it.' },
+  ops:       { blurb: 'The plumbing: money out, time spent, decisions written down.' },
+  core:      { blurb: 'Everything Allya knows about your company, in one place.' },
+};
+
+(function dotPages() {
+  const layer = document.getElementById('dotLayer');
+  if (!layer) return;
+  const wash = document.getElementById('dotWash');
+  const sheet = document.getElementById('dotSheet');
+  const body = document.getElementById('dotBody');
+  let open = false, current = null;
+
+  const STATUS = { 'needs-you': 'Needs you', running: 'Running', shipped: 'Shipped' };
+
+  function render(info) {
+    const dept = info.tier === 1;
+    const copy = DEPT_COPY[info.group] || {};
+    // work items that belong to this dot: its own, or any of its children's
+    const ids = [info.work, ...info.children.map(c => c.work)].filter(Boolean);
+    const work = WORK.filter(w => ids.includes(w.id));
+
+    let html = `
+      <div class="dot-head">
+        <button class="dot-back" id="dotBack" aria-label="Back to the brain">← The brain</button>
+        <span class="dot-crumb">${info.parent ? escapeHtml(info.parent) + ' ·' : ''} ${dept ? 'department' : 'thought'}</span>
+      </div>
+      <h1 class="dot-title">${escapeHtml(info.label)}</h1>`;
+
+    if (dept) {
+      html += `<p class="dot-blurb">${escapeHtml(copy.blurb || '')}</p>`;
+      html += `<div class="dot-sec">On Allya's mind here</div><div class="dot-thoughts">`;
+      info.children.forEach(c => {
+        html += `<button class="dot-thought" data-goto="${c.id}"><span class="dot-bullet"></span>${escapeHtml(c.label)}</button>`;
+      });
+      html += `</div>`;
+    } else {
+      html += `<p class="dot-blurb">A thought Allya is holding under ${escapeHtml(info.parent || 'your company')}. It stays here until it becomes work — or you tell her to drop it.</p>`;
+    }
+
+    if (work.length) {
+      html += `<div class="dot-sec">In flight</div>`;
+      work.forEach(w => {
+        const title = w.title || w.say;
+        html += `
+        <div class="dot-work">
+          <span class="dot-status s-${w.status}">${STATUS[w.status] || w.status}</span>
+          <div class="dot-work-copy">
+            <div class="t">${escapeHtml(title)}</div>
+            ${w.meta ? `<div class="m">${escapeHtml(w.meta)}</div>` : ''}
+          </div>
+        </div>`;
+      });
+    } else {
+      html += `<div class="dot-sec">In flight</div>
+        <div class="dot-empty">Nothing running here right now. Ask Allya to start something.</div>`;
+    }
+
+    html += `<button class="dot-cta" id="dotAsk">Ask Allya about ${escapeHtml(info.label.toLowerCase())} →</button>`;
+    body.innerHTML = html;
+
+    body.querySelectorAll('[data-goto]').forEach(b => {
+      b.addEventListener('click', () => window.__brain && window.__brain.openNode(b.dataset.goto));
+    });
+    const back = document.getElementById('dotBack');
+    if (back) { back.addEventListener('click', () => close()); pressable(back, 0.97); }
+    const ask = document.getElementById('dotAsk');
+    if (ask) {
+      pressable(ask, 0.98);
+      ask.addEventListener('click', () => {
+        close();
+        setTimeout(() => { engageChat(); sendText(`Tell me about ${info.label.toLowerCase()}`); }, 240);
+      });
+    }
+  }
+
+  function openDot(info) {
+    const wasOpen = open;
+    current = info;
+    render(info);
+    // the dot's colour drives the whole page while it's up
+    layer.style.setProperty('--dot', info.color);
+    // the sheet grows out of the node's position on screen
+    const [ox, oy] = info.origin;
+    const lr = layer.getBoundingClientRect();
+    sheet.style.setProperty('--ox', `${ox - lr.left}px`);
+    sheet.style.setProperty('--oy', `${oy - lr.top}px`);
+    if (!wasOpen) {
+      open = true;
+      layer.hidden = false;
+      void layer.offsetWidth;            // commit the start state before animating
+      layer.classList.add('is-open');
+      document.body.classList.add('dot-open');
+    } else {
+      // already open and you tapped a related dot — re-flash, don't re-enter
+      sheet.classList.remove('re'); void sheet.offsetWidth; sheet.classList.add('re');
+    }
+    // one history entry for the whole excursion — moving between dots
+    // rewrites it, so Back always lands you on the brain, not on the
+    // previous dot (and never fires a reentrant close)
+    if (wasOpen) history.replaceState({ dot: info.id }, '', '#' + info.id);
+    else history.pushState({ dot: info.id }, '', '#' + info.id);
+  }
+
+  function close(fromPop) {
+    if (!open) return;
+    open = false; current = null;
+    layer.classList.remove('is-open');
+    document.body.classList.remove('dot-open');
+    window.__brain && window.__brain.clearFocus();
+    const done = () => { if (!open) layer.hidden = true; };
+    if (reduceMotion) done(); else setTimeout(done, 420);
+    // drop the hash without navigating (a history.back() here would race
+    // the popstate that may have just called us)
+    if (!fromPop && history.state?.dot) history.replaceState(null, '', location.pathname + location.search);
+  }
+
+  // Escape closes, and so does the browser's back button
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && open) { e.stopPropagation(); close(); }
+  }, true);
+  window.addEventListener('popstate', () => { if (open) close(true); });
+  wash && wash.addEventListener('click', () => close());
+
+  window.__dot = { open: openDot, close, get isOpen() { return open; }, get current() { return current; } };
+})();
+
+/* ============================================================
    The company brain — Allya's model of the business, made touchable.
    A labeled graph: a hub (your company), its departments, and the
    concrete things under them (some mapped to live WORK). It holds a
@@ -962,6 +1100,12 @@ function unshipItem(id) {
 
   let W = 0, H = 0, dpr = 1, S = 1;
   let pulses = [], ripples = [], thoughtClock = 0, tSeed = Math.random() * 1000, lastLabelT = 0;
+
+  // ---- camera: the brain re-centres on whatever you opened. cam.x/y is the
+  // world point sitting at the middle of the box; fog dims everything that
+  // isn't the focus or one of its neighbours. All four ease toward *T. ----
+  const cam = { x: 0, y: 0, z: 1, fog: 0, xT: 0, yT: 0, zT: 1, fogT: 0 };
+  let focusNode = null;
   const TAU = Math.PI * 2;
   const nodes = DEF.nodes.map(n => ({ ...n, x: 0, y: 0, hx: 0, hy: 0, vx: 0, vy: 0, ex: 0, phase: Math.random() * Math.PI * 2 }));
   const nodeById = {}; nodes.forEach(n => (nodeById[n.id] = n));
@@ -1005,7 +1149,22 @@ function unshipItem(id) {
       n.lw = ctx.measureText(n.label).width;
     }
     layout();
+    if (!focusNode) { cam.x = cam.xT = W / 2; cam.y = cam.yT = H / 2; }
     return true;
+  }
+
+  // world ↔ screen (the camera puts cam.x/y at the centre of the box)
+  function toScreen(x, y) { return [(x - cam.x) * cam.z + W / 2, (y - cam.y) * cam.z + H / 2]; }
+  function toWorld(px, py) { return [(px - W / 2) / cam.z + cam.x, (py - H / 2) / cam.z + cam.y]; }
+
+  // how lit a node stays once something is focused: the focus itself, then
+  // its parent/children, then everything else drops back into the fog
+  function fogOf(n) {
+    if (!focusNode) return 1;
+    let rel = 0.12;
+    if (n === focusNode) rel = 1;
+    else if (n.parent === focusNode.id || focusNode.parent === n.id) rel = 0.42;
+    return 1 - cam.fog * (1 - rel);
   }
 
   const R = { 0: 7, 1: 4.8, 2: 3.1 };
@@ -1042,12 +1201,16 @@ function unshipItem(id) {
     let best = null, bestD = 1e9;
     for (const n of nodes) {
       const d = Math.hypot(px - n.x, py - n.y);
-      const hit = nodeR(n) + 13;
+      const hit = nodeR(n) + 13 / cam.z;   // keep the touch target ~constant on screen
       if (d < hit && d < bestD) { best = n; bestD = d; }
     }
     return best;
   }
-  function localPt(e) { const r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+  // pointer → world, so hit-testing keeps working while the camera is moved
+  function localPt(e) {
+    const r = canvas.getBoundingClientRect();
+    return toWorld(e.clientX - r.left, e.clientY - r.top);
+  }
 
   canvas.addEventListener('pointermove', (e) => {
     const [px, py] = localPt(e);
@@ -1085,8 +1248,42 @@ function unshipItem(id) {
       if (dt > 0) { dragNode.vx = (b.x - a.x) / dt * 0.02; dragNode.vy = (b.y - a.y) / dt * 0.02; }
     }
     const moved = pHist.length > 1 && Math.hypot(pHist[pHist.length - 1].x - pHist[0].x, pHist[pHist.length - 1].y - pHist[0].y);
-    if (!moved || moved < 4) fireThought(dragNode);   // it was a tap
+    if (!moved || moved * cam.z < 4) openNode(dragNode);   // it was a tap
     dragNode = null;
+  }
+
+  // ---- tap a dot: the brain re-centres on it, everything else fogs out,
+  // the page takes its colour, and its page rises out of the node ----
+  function openNode(n) {
+    if (!n) return;
+    // the hub is home — tapping it backs all the way out
+    if (n.tier === 0) {
+      if (window.__dot && window.__dot.isOpen) window.__dot.close();
+      else clearFocus();
+      fireThought(n);
+      return;
+    }
+    focusNode = n;
+    cam.zT = n.tier === 1 ? 1.9 : 2.3;
+    cam.fogT = 1;
+    excite(n, 1.2);
+    fireThought(n);
+    haptic(8);
+    const [sx, sy] = toScreen(n.x, n.y);
+    const r = canvas.getBoundingClientRect();
+    window.__dot && window.__dot.open({
+      id: n.id, label: n.label, tier: n.tier, group: n.group,
+      color: GROUPS[n.group] || '#91d45f', work: n.work,
+      parent: n.parent ? (nodeById[n.parent] || {}).label : null,
+      children: nodes.filter(m => m.parent === n.id).map(m => ({ id: m.id, label: m.label, work: m.work })),
+      // where on the page the dot is — the page grows out of that point
+      origin: [r.left + sx, r.top + sy],
+    });
+  }
+  function clearFocus() {
+    focusNode = null;
+    cam.xT = W / 2; cam.yT = H / 2; cam.zT = 1; cam.fogT = 0;
+    start();   // the loop may have idled out while the page was up
   }
   canvas.addEventListener('pointerup', endDrag);
   canvas.addEventListener('pointercancel', endDrag);
@@ -1123,23 +1320,38 @@ function unshipItem(id) {
       n.x += n.vx * dt; n.y += n.vy * dt;
     }
     for (const n of nodes) n.ex = Math.max(0, n.ex - dt * 1.1);
+
+    // camera + fog ease toward their targets (frame-rate independent)
+    if (focusNode) { cam.xT = focusNode.x; cam.yT = focusNode.y; }
+    const k = 1 - Math.exp(-6.5 * dt);
+    cam.x += (cam.xT - cam.x) * k;
+    cam.y += (cam.yT - cam.y) * k;
+    cam.z += (cam.zT - cam.z) * k;
+    cam.fog += (cam.fogT - cam.fog) * k;
   }
 
   function draw() {
     ctx.clearRect(0, 0, W, H);
     const time = performance.now() / 1000;
 
+    // everything below draws in world coordinates; the camera transform
+    // handles the re-centre + zoom, and is undone before the label pass
+    ctx.save();
+    ctx.translate(W / 2, H / 2); ctx.scale(cam.z, cam.z); ctx.translate(-cam.x, -cam.y);
+
     // ---- edges: gradient strands, brighter where a node is lit ----
     for (const [aid, bid] of edges) {
       const a = nodeById[aid], b = nodeById[bid];
+      ctx.globalAlpha = Math.max(fogOf(a), fogOf(b));
       const lit = Math.max(a.ex, b.ex);
       const g = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
       g.addColorStop(0, hexA(GROUPS[a.group] || '#91d45f', 0.05 + a.ex * 0.3 + lit * 0.08));
       g.addColorStop(1, hexA(GROUPS[b.group] || '#91d45f', 0.05 + b.ex * 0.3 + lit * 0.08));
       ctx.strokeStyle = g;
-      ctx.lineWidth = (0.8 + lit * 1.2) * S;
+      ctx.lineWidth = (0.8 + lit * 1.2) * S / cam.z;
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
     }
+    ctx.globalAlpha = 1;
 
     // ---- ripples: a ring blooms where you touched ----
     for (const rp of ripples) {
@@ -1171,6 +1383,7 @@ function unshipItem(id) {
     for (const n of nodes) {
       const col = GROUPS[n.group] || '#91d45f';
       const hub = n.tier === 0;
+      ctx.globalAlpha = fogOf(n);
       const liveWork = n.work && WORK.find(w => w.id === n.work && w.status === 'needs-you');
       const breath = liveWork ? 0.5 + 0.5 * Math.sin(time * 2.4 + n.phase) : 0;
       const r = nodeR(n) * (hub ? 1 + 0.05 * Math.sin(time * 1.6) : 1);
@@ -1189,10 +1402,19 @@ function unshipItem(id) {
       cg.addColorStop(0, hexA(lighten(col), clamp(base + n.ex * 0.5, 0, 1)));
       cg.addColorStop(1, hexA(col, clamp(base + n.ex * 0.4, 0, 1)));
       ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, TAU); ctx.fill();
-      if (hub) { ctx.lineWidth = 1.5 * S; ctx.strokeStyle = hexA('#eafbdc', 0.6); ctx.stroke(); }
+      if (hub) { ctx.lineWidth = 1.5 * S / cam.z; ctx.strokeStyle = hexA('#eafbdc', 0.6); ctx.stroke(); }
+
+      // the focused node keeps a bright ring around it while its page is up
+      if (n === focusNode && cam.fog > 0.02) {
+        ctx.lineWidth = 1.2 * S / cam.z;
+        ctx.strokeStyle = hexA(lighten(col), 0.5 * cam.fog);
+        ctx.beginPath(); ctx.arc(n.x, n.y, r + 7 * S / cam.z, 0, TAU); ctx.stroke();
+      }
 
       n._r = r; n._breath = breath;   // the label pass below reads these
     }
+    ctx.globalAlpha = 1;
+    ctx.restore();   // back to screen space for the labels
 
     // ---- labels: greedy de-overlap. Hub first, then departments, then
     // the most-lit leaves claim space; a label that would land on one
@@ -1206,17 +1428,20 @@ function unshipItem(id) {
       const hub = n.tier === 0;
       const fs = (hub ? 12.5 : n.tier === 1 ? 11 : 10) * clamp(S, 0.9, 1.2);
       const w = n.lw || 0;
-      const lx = clamp(n.x, w / 2 + 4, W - w / 2 - 4);
-      let ly = n.y + n._r + 3 * S;
-      if (ly + fs > H - 2) ly = n.y - n._r - 3 * S - fs;   // flip above at the bottom edge
+      const [nsx, nsy] = toScreen(n.x, n.y);
+      const nsr = n._r * cam.z;
+      const lx = clamp(nsx, w / 2 + 4, W - w / 2 - 4);
+      let ly = nsy + nsr + 3 * S;
+      if (ly + fs > H - 2) ly = nsy - nsr - 3 * S - fs;   // flip above at the bottom edge
       const box = { l: lx - w / 2 - 2, r: lx + w / 2 + 2, t: ly - 2, b: ly + fs + 2 };
-      const free = hub || !placed.some(p => box.l < p.r && box.r > p.l && box.t < p.b && box.b > p.t);
+      const onScreen = box.r > 0 && box.l < W && box.b > 0 && box.t < H;
+      const free = onScreen && (hub || !placed.some(p => box.l < p.r && box.r > p.l && box.t < p.b && box.b > p.t));
       if (free) placed.push(box);
       const target = free ? 1 : 0;
       n.lv = n.lv === undefined ? target : n.lv + (target - n.lv) * Math.min(1, ldt * 8);
       if (n.lv < 0.02) continue;
       const rest = hub ? 0.9 : n.tier === 1 ? 0.55 : 0.3;
-      const lAlpha = clamp(rest + n.ex * 0.7 + n._breath * 0.4, 0, 1) * n.lv;
+      const lAlpha = clamp(rest + n.ex * 0.7 + n._breath * 0.4, 0, 1) * n.lv * fogOf(n);
       ctx.font = `${hub ? 600 : 500} ${fs}px "Inter Tight", system-ui, sans-serif`;
       ctx.fillStyle = hexA(n.tier === 2 ? '#c7ccd4' : '#f3f4f6', lAlpha);
       ctx.fillText(n.label, lx, ly);
@@ -1262,13 +1487,20 @@ function unshipItem(id) {
   }
   function stop() { cancelAnimationFrame(raf); raf = 0; }
 
+  // deep link: /#marketing opens that dot once the layout has settled
+  const deep = decodeURIComponent(location.hash.slice(1));
+  if (deep && nodeById[deep]) setTimeout(() => openNode(nodeById[deep]), 420);
+
   window.addEventListener('resize', () => { if (resize() && reduceMotion) draw(); });
   // label widths were measured before the webfont arrived — measure again
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (resize() && reduceMotion) draw(); });
   document.addEventListener('visibilitychange', () => (document.hidden ? stop() : start()));
   start();
   window.__brain = {
-    start, stop, fireThought, nodes,
+    start, stop, fireThought, nodes, cam,
+    openNode: (id) => openNode(nodeById[id]),
+    clearFocus,
+    get focus() { return focusNode ? focusNode.id : null; },
     // dev: force N settled frames + a draw (preview tab throttles rAF)
     tickOnce(frames = 1, dt = 1 / 60) { if (!resize()) return; for (let i = 0; i < frames; i++) { if (!reduceMotion) { step(dt); for (const s of pulses) { if (s.delay > 0) s.delay -= dt; else { s.t += dt / s.dur; if (s.t >= 0.5 && !s._hit) { s._hit = true; excite(s.b, 0.6); } } } pulses = pulses.filter(s => s.t < 1); for (const rp of ripples) rp.t += dt / 0.7; ripples = ripples.filter(rp => rp.t < 1); } } draw(); },
   };

@@ -759,6 +759,138 @@ button { font-family: inherit; color: inherit; }
   .typing i, .spinner, .status-line .pulse { animation: none !important; }
   * { transition-duration: 0.01ms !important; }
 }
+/* ============================================================
+   Dot pages — tap a node, the page floods with its colour and the
+   node's page grows out of the node itself. --dot is set per node.
+   ============================================================ */
+.dot-layer {
+  --dot: var(--lime);
+  /* above the approval sheet (41), below the "Shipped." toast (60) */
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.dot-layer[hidden] { display: none; }
+
+/* the wash: the page taking the dot's colour */
+.dot-wash {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(120% 80% at 50% 100%, color-mix(in srgb, var(--dot) 34%, transparent) 0%, transparent 62%),
+    color-mix(in srgb, var(--dot) 12%, #050505);
+  opacity: 0;
+  transition: opacity 0.5s var(--ease);
+}
+.dot-layer.is-open .dot-wash { opacity: 1; }
+
+.dot-sheet {
+  position: relative;
+  width: 100%; max-width: 560px;
+  max-height: 84vh;
+  margin: 0 16px;
+  background: color-mix(in srgb, var(--dot) 7%, #0e0e0e);
+  border: 1px solid color-mix(in srgb, var(--dot) 34%, transparent);
+  border-bottom: none;
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -30px 90px -20px color-mix(in srgb, var(--dot) 40%, transparent),
+              0 -2px 0 color-mix(in srgb, var(--dot) 22%, transparent);
+  /* grows out of the tapped node: --ox/--oy is where that dot sits */
+  transform-origin: var(--ox, 50%) var(--oy, 100%);
+  transform: translateY(26px) scale(0.9);
+  opacity: 0;
+  transition: transform 0.52s var(--spring, cubic-bezier(0.2, 0.9, 0.25, 1)), opacity 0.32s var(--ease);
+}
+.dot-layer.is-open .dot-sheet { transform: translateY(0) scale(1); opacity: 1; }
+.dot-sheet.re { animation: dot-reflash 0.4s var(--ease); }
+@keyframes dot-reflash {
+  0% { transform: scale(0.985); } 60% { transform: scale(1.006); } 100% { transform: scale(1); }
+}
+
+.dot-scroll { overflow-y: auto; max-height: 84vh; padding: 18px 22px 26px; }
+
+.dot-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dot-back {
+  appearance: none; cursor: pointer;
+  background: color-mix(in srgb, var(--dot) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dot) 30%, transparent);
+  color: color-mix(in srgb, var(--dot) 60%, #ffffff);
+  border-radius: 999px; padding: 5px 12px; font-size: 12px;
+}
+.dot-back:hover { background: color-mix(in srgb, var(--dot) 22%, transparent); }
+.dot-crumb { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--fg-faint); }
+
+.dot-title {
+  font-family: var(--serif); font-weight: 500;
+  font-size: clamp(26px, 6vw, 38px); line-height: 1.1;
+  margin: 14px 0 0; color: var(--fg);
+}
+.dot-blurb { margin: 10px 0 0; font-size: 14px; line-height: 1.55; color: var(--fg-soft); max-width: 46ch; }
+
+.dot-sec {
+  margin: 24px 0 10px; font-size: 11px; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--fg-faint);
+}
+
+.dot-thoughts { display: flex; flex-wrap: wrap; gap: 7px; }
+.dot-thought {
+  appearance: none; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--hairline);
+  color: var(--fg); border-radius: 999px;
+  padding: 7px 13px; font-size: 12.5px;
+  transition: background 0.2s var(--ease), border-color 0.2s var(--ease), transform 0.2s var(--ease);
+}
+.dot-thought:hover {
+  background: color-mix(in srgb, var(--dot) 16%, transparent);
+  border-color: color-mix(in srgb, var(--dot) 44%, transparent);
+  transform: translateY(-1px);
+}
+.dot-bullet {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--dot);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--dot) 70%, transparent);
+}
+
+.dot-work {
+  display: flex; gap: 11px; align-items: flex-start;
+  padding: 11px 0; border-top: 1px solid var(--hairline);
+}
+.dot-work-copy .t { font-size: 13.5px; line-height: 1.45; color: var(--fg); }
+.dot-work-copy .m { font-size: 11.5px; color: var(--fg-faint); margin-top: 3px; }
+.dot-status {
+  flex: none; margin-top: 2px;
+  font-size: 10.5px; letter-spacing: 0.03em;
+  border-radius: 999px; padding: 3px 8px;
+  border: 1px solid var(--hairline-strong); color: var(--fg-soft);
+  white-space: nowrap;
+}
+.dot-status.s-needs-you { color: var(--human-ink); border-color: var(--human-border); background: var(--human-bg); }
+.dot-status.s-running { color: var(--dot); border-color: color-mix(in srgb, var(--dot) 40%, transparent); }
+.dot-status.s-shipped { color: var(--fg-faint); }
+.dot-empty { font-size: 13px; color: var(--fg-faint); padding: 10px 0; border-top: 1px solid var(--hairline); }
+
+.dot-cta {
+  appearance: none; cursor: pointer; width: 100%;
+  margin-top: 22px; padding: 12px 16px;
+  border-radius: 12px; border: none;
+  background: var(--dot); color: var(--on-lime);
+  font-size: 13.5px; font-weight: 500;
+}
+
+@media (min-width: 900px) {
+  .dot-layer { align-items: center; }
+  .dot-sheet {
+    border-radius: 20px; border-bottom: 1px solid color-mix(in srgb, var(--dot) 34%, transparent);
+    max-height: 78vh;
+  }
+  .dot-scroll { max-height: 78vh; padding: 22px 26px 26px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot-sheet { transition: opacity 0.2s linear; transform: none; }
+  .dot-layer.is-open .dot-sheet { transform: none; }
+  .dot-wash { transition: opacity 0.2s linear; }
+}
+
 @media (prefers-reduced-transparency: reduce) {
   .topbar, .composer, .sheet-foot { background: var(--bg); backdrop-filter: none; -webkit-backdrop-filter: none; }
   .scrim { background: rgba(0,0,0,0.72); }
