@@ -27,6 +27,20 @@
 }
 .ob-topbrand .ob-by { color: var(--fg-faint); font-weight: 400; }
 
+/* the way out — mirrors the brand mark, sits above every screen */
+.ob-back {
+  position: fixed; top: 14px; right: 22px; z-index: 50;
+  display: inline-flex; align-items: center;
+  font-size: 12px; color: var(--fg-faint); text-decoration: none;
+  border: 1px solid var(--hairline); border-radius: 999px;
+  padding: 5px 12px; background: rgba(255, 255, 255, 0.03);
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease), background 0.2s var(--ease);
+}
+.ob-back:hover {
+  color: var(--fg); border-color: var(--hairline-strong);
+  background: rgba(255, 255, 255, 0.06);
+}
+
 /* ============================================================
    1 · Intro
    ============================================================ */
@@ -370,6 +384,7 @@
   .ob-facts { grid-template-columns: 1fr; }
   .ob-can-grid { grid-template-columns: 1fr; }
   .ob-topbrand { top: 14px; left: 16px; }
+  .ob-back { top: 12px; right: 14px; padding: 4px 10px; font-size: 11.5px; }
   .ob-show { padding-top: 58px; }
 }
 
