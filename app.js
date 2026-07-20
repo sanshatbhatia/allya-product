@@ -919,31 +919,31 @@ function unshipItem(id) {
       { id: 'sales', label: 'Sales', tier: 1, group: 'sales', parent: 'co' },
       { id: 'ops', label: 'Ops', tier: 1, group: 'ops', parent: 'co' },
       // marketing — leaves are live thoughts, not service names
-      { id: 'newsletter', label: 'Founder letter #12', tier: 2, group: 'marketing', parent: 'marketing', work: 'newsletter' },
-      { id: 'campaigns', label: 'Reel: day-one story', tier: 2, group: 'marketing', parent: 'marketing' },
+      { id: 'newsletter', label: 'Draft the newsletter', tier: 2, group: 'marketing', parent: 'marketing', work: 'newsletter' },
+      { id: 'campaigns', label: 'Reel: the day-one story', tier: 2, group: 'marketing', parent: 'marketing' },
       { id: 'seo', label: 'Own “fast”, not “cheap”', tier: 2, group: 'marketing', parent: 'marketing' },
-      { id: 'social', label: 'LinkedIn: the pivot', tier: 2, group: 'marketing', parent: 'marketing' },
-      { id: 'content', label: 'Cut demo into shorts', tier: 2, group: 'marketing', parent: 'marketing' },
+      { id: 'social', label: 'LinkedIn: the pivot lesson', tier: 2, group: 'marketing', parent: 'marketing' },
+      { id: 'content', label: 'Cut the demo into shorts', tier: 2, group: 'marketing', parent: 'marketing' },
       // hiring
-      { id: 'candidates', label: '12 to screen', tier: 2, group: 'hiring', parent: 'hiring', work: 'screening' },
-      { id: 'jd', label: 'Designer before marketer', tier: 2, group: 'hiring', parent: 'hiring', work: 'jd' },
+      { id: 'candidates', label: '6 candidates to screen', tier: 2, group: 'hiring', parent: 'hiring', work: 'screening' },
+      { id: 'jd', label: 'Hire a designer first', tier: 2, group: 'hiring', parent: 'hiring', work: 'jd' },
       { id: 'interviews', label: 'Add a founder round', tier: 2, group: 'hiring', parent: 'hiring' },
       { id: 'onboarding', label: 'Day-one checklist', tier: 2, group: 'hiring', parent: 'hiring' },
       // pr
-      { id: 'presslist', label: 'Refresh press list', tier: 2, group: 'pr', parent: 'pr', work: 'press' },
-      { id: 'journalists', label: '3 warm reporters', tier: 2, group: 'pr', parent: 'pr' },
-      { id: 'pitches', label: 'Pitch the pivot', tier: 2, group: 'pr', parent: 'pr' },
-      { id: 'coverage', label: 'Chase TechCrunch', tier: 2, group: 'pr', parent: 'pr' },
+      { id: 'presslist', label: 'Refresh the press list', tier: 2, group: 'pr', parent: 'pr', work: 'press' },
+      { id: 'journalists', label: '3 reporters to warm up', tier: 2, group: 'pr', parent: 'pr' },
+      { id: 'pitches', label: 'Pitch the pivot story', tier: 2, group: 'pr', parent: 'pr' },
+      { id: 'coverage', label: 'Follow up: TechCrunch', tier: 2, group: 'pr', parent: 'pr' },
       // sales
-      { id: 'leads', label: '7 warm leads waiting', tier: 2, group: 'sales', parent: 'sales', work: 'leads' },
-      { id: 'crm', label: 'Clean the CRM', tier: 2, group: 'sales', parent: 'sales', work: 'crm' },
+      { id: 'leads', label: '7 warm leads to call', tier: 2, group: 'sales', parent: 'sales', work: 'leads' },
+      { id: 'crm', label: 'Clean up the CRM', tier: 2, group: 'sales', parent: 'sales', work: 'crm' },
       { id: 'pipeline', label: 'Push referrals next', tier: 2, group: 'sales', parent: 'sales' },
-      { id: 'outreach', label: 'Call churned users', tier: 2, group: 'sales', parent: 'sales' },
+      { id: 'outreach', label: 'Win back churned users', tier: 2, group: 'sales', parent: 'sales' },
       // ops
-      { id: 'calendar', label: 'Deep-work Fridays', tier: 2, group: 'ops', parent: 'ops' },
-      { id: 'docs', label: 'Pricing memo', tier: 2, group: 'ops', parent: 'ops' },
+      { id: 'calendar', label: 'Protect deep-work Fridays', tier: 2, group: 'ops', parent: 'ops' },
+      { id: 'docs', label: 'Write the pricing memo', tier: 2, group: 'ops', parent: 'ops' },
       { id: 'finance', label: 'Test annual pricing', tier: 2, group: 'ops', parent: 'ops' },
-      { id: 'vendors', label: 'Cut hosting cost', tier: 2, group: 'ops', parent: 'ops' },
+      { id: 'vendors', label: 'Cut hosting costs', tier: 2, group: 'ops', parent: 'ops' },
     ],
     // cross-links weave the tree into a web
     cross: [
@@ -961,7 +961,7 @@ function unshipItem(id) {
   DEF.cross.forEach(([a, b]) => edges.push([a, b]));
 
   let W = 0, H = 0, dpr = 1, S = 1;
-  let pulses = [], ripples = [], thoughtClock = 0, tSeed = Math.random() * 1000;
+  let pulses = [], ripples = [], thoughtClock = 0, tSeed = Math.random() * 1000, lastLabelT = 0;
   const TAU = Math.PI * 2;
   const nodes = DEF.nodes.map(n => ({ ...n, x: 0, y: 0, hx: 0, hy: 0, vx: 0, vy: 0, ex: 0, phase: Math.random() * Math.PI * 2 }));
   const nodeById = {}; nodes.forEach(n => (nodeById[n.id] = n));
@@ -1191,14 +1191,35 @@ function unshipItem(id) {
       ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, TAU); ctx.fill();
       if (hub) { ctx.lineWidth = 1.5 * S; ctx.strokeStyle = hexA('#eafbdc', 0.6); ctx.stroke(); }
 
-      // label — on small boxes resting leaf labels would collide, so they
-      // only surface while the node is lit (a thought fired / touch)
-      const rest = hub ? 0.9 : n.tier === 1 ? 0.55 : (W < 420 ? 0 : 0.3);
-      const lAlpha = clamp(rest + n.ex * 0.7 + breath * 0.4, 0, 1);
-      ctx.font = `${hub ? 600 : 500} ${(hub ? 12.5 : n.tier === 1 ? 11 : 10) * clamp(S, 0.9, 1.2)}px "Inter Tight", system-ui, sans-serif`;
+      n._r = r; n._breath = breath;   // the label pass below reads these
+    }
+
+    // ---- labels: greedy de-overlap. Hub first, then departments, then
+    // the most-lit leaves claim space; a label that would land on one
+    // already placed fades out instead of stacking on top of it ----
+    const lnow = performance.now();
+    const ldt = lastLabelT ? Math.min(0.1, (lnow - lastLabelT) / 1000) : 0;
+    lastLabelT = lnow;
+    const order = nodes.slice().sort((a, b) => (a.tier - b.tier) || ((b.ex + b._breath) - (a.ex + a._breath)));
+    const placed = [];
+    for (const n of order) {
+      const hub = n.tier === 0;
+      const fs = (hub ? 12.5 : n.tier === 1 ? 11 : 10) * clamp(S, 0.9, 1.2);
+      const w = n.lw || 0;
+      const lx = clamp(n.x, w / 2 + 4, W - w / 2 - 4);
+      let ly = n.y + n._r + 3 * S;
+      if (ly + fs > H - 2) ly = n.y - n._r - 3 * S - fs;   // flip above at the bottom edge
+      const box = { l: lx - w / 2 - 2, r: lx + w / 2 + 2, t: ly - 2, b: ly + fs + 2 };
+      const free = hub || !placed.some(p => box.l < p.r && box.r > p.l && box.t < p.b && box.b > p.t);
+      if (free) placed.push(box);
+      const target = free ? 1 : 0;
+      n.lv = n.lv === undefined ? target : n.lv + (target - n.lv) * Math.min(1, ldt * 8);
+      if (n.lv < 0.02) continue;
+      const rest = hub ? 0.9 : n.tier === 1 ? 0.55 : 0.3;
+      const lAlpha = clamp(rest + n.ex * 0.7 + n._breath * 0.4, 0, 1) * n.lv;
+      ctx.font = `${hub ? 600 : 500} ${fs}px "Inter Tight", system-ui, sans-serif`;
       ctx.fillStyle = hexA(n.tier === 2 ? '#c7ccd4' : '#f3f4f6', lAlpha);
-      const lx = clamp(n.x, (n.lw || 0) / 2 + 4, W - (n.lw || 0) / 2 - 4);
-      ctx.fillText(n.label, lx, n.y + r + 3 * S);
+      ctx.fillText(n.label, lx, ly);
     }
   }
   function lighten(hex) {
