@@ -1,0 +1,362 @@
+/* ============================================================
+   Allya — onboarding
+   Reuses the workspace design tokens from styles.css (:root) and
+   its components (.cta, .avatar, .chip, .bubble). This file adds the
+   onboarding-specific layout: intro, the ask+brain split, synthesis,
+   and the "what Allya can do" showcase. All prefixed .ob-.
+   ============================================================ */
+
+.ob-body { overflow: hidden; }
+
+/* every screen is a fixed, self-scrolling layer so we can spring
+   between them without the page ever scrolling */
+.ob-screen {
+  position: fixed; inset: 0;
+  overflow-y: auto;
+  display: flex;
+  will-change: opacity, transform;
+}
+.ob-screen[hidden] { display: none; }
+
+/* corner brand, present on every screen */
+.ob-topbrand {
+  position: fixed; top: 18px; left: 22px; z-index: 50;
+  display: flex; align-items: center; gap: 9px;
+  font-size: 13.5px; font-weight: 500; letter-spacing: -0.01em; color: var(--fg);
+  pointer-events: none;
+}
+.ob-topbrand .ob-by { color: var(--fg-faint); font-weight: 400; }
+
+/* ============================================================
+   1 · Intro
+   ============================================================ */
+.ob-intro { align-items: center; justify-content: center; padding: 40px 24px; }
+.ob-intro::before {
+  content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(60% 50% at 50% 38%, rgba(145, 212, 95, 0.10), transparent 60%),
+    radial-gradient(50% 60% at 82% 90%, rgba(167, 139, 218, 0.06), transparent 60%);
+}
+.ob-intro-inner { position: relative; z-index: 1; max-width: 620px; width: 100%; }
+.ob-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 11.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--fg-faint); margin-bottom: 22px;
+}
+.ob-eyebrow-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 8px rgba(145,212,95,0.7); }
+.ob-title {
+  font-family: var(--serif); font-optical-sizing: auto; font-weight: 470;
+  font-size: clamp(34px, 6vw, 56px); line-height: 1.05; letter-spacing: -0.02em;
+  margin: 0 0 22px; color: var(--fg); text-wrap: balance;
+}
+.ob-title-accent { color: var(--lime); font-style: italic; font-weight: 460; }
+.ob-lede {
+  font-size: 16px; line-height: 1.6; color: var(--fg-soft);
+  margin: 0 0 26px; max-width: 540px;
+}
+.ob-assure { list-style: none; margin: 0 0 30px; padding: 0; display: grid; gap: 12px; max-width: 540px; }
+.ob-assure li {
+  position: relative; padding-left: 26px;
+  font-size: 13.5px; line-height: 1.5; color: var(--fg-soft);
+}
+.ob-assure li b { color: var(--fg); font-weight: 500; }
+.ob-assure li::before {
+  content: ""; position: absolute; left: 4px; top: 7px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--lime-dim); border: 1px solid var(--lime);
+}
+.ob-start { font-size: 15px; padding: 13px 22px; }
+.ob-meta { font-size: 12.5px; color: var(--fg-faint); margin: 16px 0 0; }
+
+/* ============================================================
+   2 · Ask — question column + brain column
+   ============================================================ */
+.ob-ask { flex-direction: column; overflow: hidden; }
+
+.ob-progress { flex: none; height: 2px; background: rgba(255,255,255,0.06); position: relative; z-index: 5; }
+.ob-progress-bar {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--lime), var(--lime-glow));
+  box-shadow: 0 0 12px rgba(145,212,95,0.6);
+  transition: width 620ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ob-ask-grid {
+  flex: 1; min-height: 0;
+  display: grid; grid-template-columns: 1fr 1.06fr;
+  width: 100%; max-width: 1200px; margin: 0 auto;
+}
+
+/* left — the question */
+.ob-q-col {
+  display: flex; align-items: center;
+  padding: 40px clamp(28px, 5vw, 68px) 40px;
+  border-right: 1px solid var(--hairline);
+  min-width: 0;
+}
+.ob-q-inner { width: 100%; max-width: 480px; will-change: opacity, transform; }
+.ob-step-tag {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--fg-faint); margin-bottom: 20px;
+}
+.ob-step-tag b { color: var(--lime); font-weight: 600; }
+.ob-ask-who { display: flex; align-items: center; gap: 9px; margin-bottom: 14px; }
+.ob-ask-name { font-size: 12.5px; font-weight: 500; color: var(--fg); }
+.ob-ask-role { color: var(--fg-faint); font-weight: 400; }
+.ob-question {
+  font-family: var(--serif); font-optical-sizing: auto; font-weight: 440;
+  font-size: clamp(22px, 3vw, 30px); line-height: 1.25; letter-spacing: -0.01em;
+  color: var(--fg); margin: 0 0 24px; text-wrap: pretty;
+}
+
+/* the answer input */
+.ob-answer { margin-bottom: 22px; }
+.ob-field {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 14px;
+  color: var(--fg);
+  font-family: var(--sans); font-size: 15.5px; line-height: 1.55;
+  padding: 15px 16px;
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+  resize: none; outline: none;
+}
+.ob-field::placeholder { color: var(--fg-faint); }
+.ob-field:focus { border-color: var(--lime); box-shadow: 0 0 0 3px var(--lime-dim); }
+textarea.ob-field { min-height: 128px; }
+
+.ob-example {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: 12px; cursor: pointer;
+  appearance: none; background: none; border: none;
+  font-size: 12.5px; color: var(--fg-faint); font-family: var(--sans);
+}
+.ob-example:hover { color: var(--lime-glow); }
+.ob-example svg { width: 13px; height: 13px; }
+
+/* choice chips */
+.ob-choices { display: flex; flex-wrap: wrap; gap: 10px; }
+.ob-choice {
+  appearance: none; cursor: pointer;
+  font-family: var(--serif); font-optical-sizing: auto; font-weight: 430; font-size: 16px;
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 13px;
+  padding: 14px 20px;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), transform var(--dur) var(--ease);
+  will-change: transform;
+}
+.ob-choice:hover { background: var(--raised); border-color: var(--hairline-strong); }
+.ob-choice.selected { background: var(--lime-dim); border-color: var(--lime); color: var(--lime-glow); }
+
+.ob-actions { display: flex; align-items: center; gap: 14px; }
+.ob-continue { font-size: 14px; }
+.ob-continue:disabled { opacity: 0.4; cursor: default; }
+.ob-hint { font-size: 12px; color: var(--fg-faint); }
+.ob-hint kbd {
+  font-family: var(--sans); font-size: 11px;
+  border: 1px solid var(--hairline); border-radius: 4px; padding: 1px 5px;
+  background: var(--surface); color: var(--fg-soft);
+}
+
+/* right — the brain */
+.ob-brain-col { display: flex; flex-direction: column; min-width: 0; padding: 20px; }
+.ob-brain-box {
+  position: relative; flex: 1; min-height: 0;
+  border: 1px solid rgba(145, 212, 95, 0.18);
+  border-radius: 18px; overflow: hidden;
+  background:
+    radial-gradient(130% 100% at 50% 42%, rgba(145, 212, 95, 0.07), transparent 58%),
+    radial-gradient(90% 120% at 88% 8%, rgba(167, 139, 218, 0.05), transparent 55%),
+    radial-gradient(90% 120% at 10% 92%, rgba(95, 191, 168, 0.05), transparent 55%),
+    #0d0f0d;
+  box-shadow: inset 0 0 80px -26px rgba(145, 212, 95, 0.20);
+}
+.ob-brain-head {
+  position: absolute; top: 16px; left: 18px; right: 18px; z-index: 2;
+  display: flex; align-items: baseline; justify-content: space-between;
+  pointer-events: none;
+}
+.ob-brain-title { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 500; color: var(--fg); }
+.brain-live { width: 6px; height: 6px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 8px rgba(145,212,95,0.8); animation: pulse 2.4s var(--ease) infinite; }
+.ob-brain-sub { font-size: 11.5px; color: var(--lime-glow); font-variant: small-caps; letter-spacing: 0.02em; }
+.ob-brain-box canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+.ob-brain-box canvas:active { cursor: grabbing; }
+
+/* the "what I just learned" ledger, bottom-left of the brain */
+.ob-ledger {
+  position: absolute; left: 16px; bottom: 14px; right: 16px; z-index: 2;
+  display: flex; flex-direction: column; gap: 5px; pointer-events: none;
+}
+.ob-ledger-item {
+  display: inline-flex; align-items: center; gap: 8px; align-self: flex-start;
+  max-width: 100%;
+  font-size: 11.5px; color: var(--fg-soft);
+  background: rgba(12,12,12,0.9);
+  border: 1px solid var(--hairline); border-radius: 999px;
+  padding: 4px 11px 4px 8px;
+  will-change: transform, opacity;
+}
+.ob-ledger-item .lg-tick {
+  flex: none; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--lime-dim); display: grid; place-items: center;
+}
+.ob-ledger-item .lg-tick svg { width: 8px; height: 8px; }
+.ob-ledger-item b { color: var(--fg); font-weight: 500; }
+
+/* ============================================================
+   3 · Synthesis
+   ============================================================ */
+.ob-synth { align-items: center; justify-content: center; flex-direction: column; overflow: hidden; }
+.ob-synth-brain { position: absolute; inset: 0; z-index: 0; }
+.ob-synth-brain .ob-brain-box { position: absolute; inset: -1px; border-radius: 0; border: none; }
+.ob-synth-status {
+  position: relative; z-index: 2;
+  display: flex; align-items: center; gap: 12px;
+  font-family: var(--serif); font-weight: 430; font-size: clamp(20px, 3.4vw, 28px);
+  color: var(--fg);
+  background: rgba(12,12,12,0.88);
+  padding: 16px 26px; border-radius: 999px; border: 1px solid var(--hairline);
+}
+.ob-synth-spark { color: var(--lime); animation: sparkspin 3s linear infinite; }
+@keyframes sparkspin { to { transform: rotate(360deg); } }
+
+/* ============================================================
+   4 · Showcase — "what Allya can do for you"
+   ============================================================ */
+.ob-show { justify-content: center; padding: 68px 24px 40px; }
+.ob-show-inner { width: 100%; max-width: 900px; }
+
+.ob-show-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 11.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--fg-faint); margin-bottom: 16px;
+}
+.ob-show-eyebrow .ob-eyebrow-dot { animation: pulse 2.4s var(--ease) infinite; }
+.ob-show-lead {
+  font-family: var(--serif); font-optical-sizing: auto; font-weight: 450;
+  font-size: clamp(26px, 4.2vw, 40px); line-height: 1.15; letter-spacing: -0.02em;
+  color: var(--fg); margin: 0 0 8px; text-wrap: balance;
+}
+.ob-show-sub { font-size: 15px; color: var(--fg-soft); margin: 0 0 34px; line-height: 1.55; max-width: 620px; }
+
+/* the essence trio: one word, base, pitch */
+.ob-essence { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 16px; margin-bottom: 16px; }
+.ob-card {
+  background: var(--card); border: 1px solid var(--hairline);
+  border-radius: 18px; padding: 22px 24px;
+  will-change: transform, opacity;
+}
+.ob-card .ob-kicker {
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--fg-faint); margin-bottom: 12px;
+}
+.ob-oneword-card {
+  grid-row: span 1;
+  display: flex; flex-direction: column; justify-content: center;
+  background:
+    radial-gradient(120% 100% at 20% 0%, rgba(145,212,95,0.10), transparent 60%), var(--card);
+  border-color: rgba(145,212,95,0.28);
+}
+.ob-oneword {
+  font-family: var(--serif); font-optical-sizing: auto; font-weight: 480; font-style: italic;
+  font-size: clamp(34px, 6vw, 52px); line-height: 1; letter-spacing: -0.02em;
+  color: var(--lime); text-wrap: balance;
+}
+.ob-oneword-note { font-size: 12.5px; color: var(--fg-soft); margin-top: 12px; line-height: 1.5; }
+
+.ob-pitch { display: flex; flex-direction: column; justify-content: center; }
+.ob-pitch p {
+  font-family: var(--serif); font-optical-sizing: auto; font-weight: 430;
+  font-size: 19px; line-height: 1.5; color: var(--fg); margin: 0;
+  text-wrap: pretty;
+}
+
+.ob-facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
+.ob-fact .ob-fact-val { font-size: 16px; font-weight: 500; color: var(--fg); line-height: 1.4; margin-top: 2px; }
+.ob-fact .ob-fact-val .ob-seg {
+  display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: 0.03em;
+  color: var(--lime-glow); background: var(--lime-dim);
+  border: 1px solid rgba(145,212,95,0.35); border-radius: 999px;
+  padding: 1px 9px; margin-bottom: 6px;
+}
+.ob-goals-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 9px; }
+.ob-goals-list li {
+  position: relative; padding-left: 22px;
+  font-size: 14px; line-height: 1.45; color: var(--fg);
+}
+.ob-goals-list li .gn {
+  position: absolute; left: 0; top: 0;
+  font-size: 11px; font-weight: 600; color: var(--lime); font-variant-numeric: tabular-nums;
+}
+
+/* what Allya can do — capability grid */
+.ob-can {
+  background: var(--card); border: 1px solid var(--hairline);
+  border-radius: 18px; padding: 24px; margin-bottom: 16px;
+}
+.ob-can-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 18px; flex-wrap: wrap; gap: 8px; }
+.ob-can-head h3 { font-family: var(--serif); font-weight: 460; font-size: 20px; margin: 0; color: var(--fg); letter-spacing: -0.01em; }
+.ob-can-head .ob-split { font-size: 11.5px; color: var(--fg-faint); }
+.ob-can-head .ob-split b { color: var(--fg-soft); font-weight: 500; }
+.ob-can-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.ob-cap {
+  display: flex; gap: 12px; align-items: flex-start;
+  background: var(--surface); border: 1px solid var(--hairline);
+  border-radius: 13px; padding: 14px 15px;
+  will-change: transform, opacity;
+}
+.ob-cap .ob-cap-ic {
+  flex: none; width: 30px; height: 30px; border-radius: 9px;
+  display: grid; place-items: center; margin-top: 1px;
+  background: var(--lime-dim); border: 1px solid rgba(145,212,95,0.3);
+}
+.ob-cap.exp .ob-cap-ic { background: var(--human-bg); border-color: var(--human-border); }
+.ob-cap .ob-cap-ic svg { width: 15px; height: 15px; }
+.ob-cap .ob-cap-copy { min-width: 0; }
+.ob-cap .ob-cap-title { font-size: 13.5px; font-weight: 500; color: var(--fg); line-height: 1.3; }
+.ob-cap .ob-cap-line { font-size: 12.5px; color: var(--fg-soft); margin-top: 3px; line-height: 1.45; }
+.ob-cap .pill {
+  flex: none; font-size: 10.5px; font-weight: 500; align-self: flex-start;
+  border-radius: 999px; padding: 2px 8px; margin-left: auto;
+  border: 1px solid var(--hairline); color: var(--fg-soft); background: var(--surface);
+}
+.ob-cap .pill.expert { color: var(--human-ink); background: var(--human-bg); border-color: var(--human-border); }
+
+/* the launch bar */
+.ob-launch {
+  display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  background:
+    radial-gradient(120% 200% at 90% 50%, rgba(145,212,95,0.10), transparent 60%), var(--card);
+  border: 1px solid rgba(145,212,95,0.35);
+  border-radius: 18px; padding: 22px 24px;
+  box-shadow: 0 0 40px -18px rgba(145,212,95,0.5);
+  flex-wrap: wrap;
+}
+.ob-launch-copy .t { font-family: var(--serif); font-weight: 450; font-size: 19px; color: var(--fg); }
+.ob-launch-copy .s { font-size: 13px; color: var(--fg-soft); margin-top: 4px; }
+.ob-enter { font-size: 15px; padding: 14px 24px; }
+
+/* ============================================================
+   Mobile
+   ============================================================ */
+@media (max-width: 880px) {
+  .ob-ask-grid { grid-template-columns: 1fr; grid-template-rows: minmax(240px, 42vh) 1fr; }
+  .ob-brain-col { order: -1; padding: 12px 12px 0; }
+  .ob-q-col { border-right: none; border-top: 1px solid var(--hairline); padding: 24px 22px 28px; align-items: flex-start; }
+  .ob-brain-box { border-radius: 16px; }
+  .ob-ledger { display: none; }
+
+  .ob-essence { grid-template-columns: 1fr; }
+  .ob-facts { grid-template-columns: 1fr; }
+  .ob-can-grid { grid-template-columns: 1fr; }
+  .ob-topbrand { top: 14px; left: 16px; }
+  .ob-show { padding-top: 58px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ob-progress-bar { transition: none; }
+  .ob-synth-spark, .brain-live, .ob-show-eyebrow .ob-eyebrow-dot { animation: none !important; }
+}

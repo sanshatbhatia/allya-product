@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Allya — onboarding</title>
+  <meta name="description" content="Meet Allya — a short conversation with your AI cofounder. Watch your company brain build itself as you answer." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,380..560&family=Inter+Tight:wght@400;450;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="onboarding.css" />
+</head>
+<body class="ob-body">
+
+  <!-- ambient lamp in the corner, everywhere -->
+  <div class="ob-topbrand"><span class="lamp"></span> Allya <span class="ob-by">by Zeroto10</span></div>
+
+  <!-- ================= 1 · Intro ================= -->
+  <section class="ob-screen ob-intro" id="screenIntro">
+    <div class="ob-intro-inner">
+      <div class="ob-eyebrow"><span class="ob-eyebrow-dot"></span> AI Onboarding</div>
+      <h1 class="ob-title">Let's get your<br>business <span class="ob-title-accent">onboarded.</span></h1>
+      <p class="ob-lede">A short, focused conversation with your AI cofounder. The more you share, the sharper Allya plans, thinks, and works for you — and you'll watch it build a live model of your company as you talk.</p>
+      <ul class="ob-assure">
+        <li><b>Answers lock once given.</b> Take your time — depth beats speed here.</li>
+        <li><b>Nothing is lost.</b> Leave anytime, resume where you left off.</li>
+        <li><b>Watch the brain build.</b> Every answer adds to your company map.</li>
+        <li><b>Then see what Allya can do.</b> Concrete work, mapped to your goals.</li>
+      </ul>
+      <button class="cta ob-start" id="startBtn">Start onboarding
+        <svg viewBox="0 0 24 24" fill="none" width="17" height="17"><path d="M4 12h15M13 6l6 6-6 6" stroke="#0a0a0a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <p class="ob-meta">6 questions · about 3 minutes</p>
+    </div>
+  </section>
+
+  <!-- ================= 2 · Ask (question + growing brain) ================= -->
+  <section class="ob-screen ob-ask" id="screenAsk" hidden>
+    <div class="ob-progress"><div class="ob-progress-bar" id="progressBar"></div></div>
+
+    <div class="ob-ask-grid">
+      <!-- left: the conversation -->
+      <div class="ob-q-col">
+        <div class="ob-q-inner" id="qInner">
+          <div class="ob-step-tag" id="stepTag">First things first</div>
+          <div class="ob-ask-who">
+            <span class="avatar">A</span>
+            <span class="ob-ask-name">Allya <span class="ob-ask-role">· your cofounder</span></span>
+          </div>
+          <p class="ob-question" id="questionText">Hi — I'm Allya. Before we begin, what should I call your company?</p>
+
+          <div class="ob-answer" id="answerZone">
+            <!-- input injected here -->
+          </div>
+
+          <div class="ob-actions">
+            <button class="cta ob-continue" id="continueBtn" disabled>Continue
+              <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M4 12h15M13 6l6 6-6 6" stroke="#0a0a0a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <span class="ob-hint" id="continueHint">press Enter</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- right: the brain, building live -->
+      <div class="ob-brain-col">
+        <div class="ob-brain-box" id="brainBox">
+          <div class="ob-brain-head">
+            <span class="ob-brain-title"><span class="brain-live"></span> The brain</span>
+            <span class="ob-brain-sub" id="brainSub">building as you talk…</span>
+          </div>
+          <canvas id="obCanvas"></canvas>
+          <div class="ob-ledger" id="ledger"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 3 · Synthesis ================= -->
+  <section class="ob-screen ob-synth" id="screenSynth" hidden>
+    <div class="ob-synth-brain" id="synthBrainMount"></div>
+    <div class="ob-synth-status">
+      <span class="ob-synth-spark">✦</span>
+      <span id="synthStatus">Waking up your cofounder…</span>
+    </div>
+  </section>
+
+  <!-- ================= 4 · Showcase ================= -->
+  <section class="ob-screen ob-show" id="screenShow" hidden>
+    <div class="ob-show-inner" id="showInner">
+      <!-- rendered by JS -->
+    </div>
+  </section>
+
+  <script src="onboarding.js"></script>
+</body>
+</html>
