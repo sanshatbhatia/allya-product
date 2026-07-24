@@ -327,6 +327,14 @@
   font-size: 19px; line-height: 1.5; color: var(--fg); margin: 0;
   text-wrap: pretty;
 }
+/* the pitch now opens the page, so it carries the lime accent the
+   one-word card used to */
+.ob-pitch-lead {
+  margin-bottom: 16px;
+  background: radial-gradient(120% 100% at 15% 0%, rgba(145,212,95,0.09), transparent 62%), var(--card);
+  border-color: rgba(145,212,95,0.26);
+}
+.ob-pitch-lead p { font-size: clamp(19px, 2.5vw, 24px); }
 
 .ob-facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
 .ob-fact .ob-fact-val { font-size: 16px; font-weight: 500; color: var(--fg); line-height: 1.4; margin-top: 2px; }
@@ -347,6 +355,23 @@
 }
 
 /* what Allya can do — capability grid */
+/* what Allya picked up — proof it was listening, in their own words */
+.ob-know {
+  background: var(--card); border: 1px solid var(--hairline);
+  border-radius: 18px; padding: 24px; margin-bottom: 16px;
+}
+.ob-know-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+.ob-know-head h3 { font-family: var(--serif); font-weight: 460; font-size: 20px; margin: 0; color: var(--fg); letter-spacing: -0.01em; }
+.ob-know-note { font-size: 11.5px; color: var(--fg-faint); }
+.ob-know-grid { display: grid; gap: 0; }
+.ob-know-item {
+  display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 16px;
+  padding: 11px 0; border-top: 1px solid var(--hairline);
+}
+.ob-know-item:first-child { border-top: none; padding-top: 0; }
+.ob-know-k { font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-faint); padding-top: 2px; }
+.ob-know-v { font-size: 14px; line-height: 1.5; color: var(--fg); }
+
 .ob-can {
   background: var(--card); border: 1px solid var(--hairline);
   border-radius: 18px; padding: 24px; margin-bottom: 16px;
@@ -411,6 +436,8 @@
   .ob-essence { grid-template-columns: 1fr; }
   .ob-facts { grid-template-columns: 1fr; }
   .ob-can-grid { grid-template-columns: 1fr; }
+  /* the key/value rows stack rather than squeezing the value column */
+  .ob-know-item { grid-template-columns: 1fr; gap: 3px; }
   .ob-topbrand { top: 14px; left: 16px; }
   .ob-back { top: 12px; right: 14px; padding: 4px 10px; font-size: 11.5px; }
   .ob-show { padding-top: 58px; }
@@ -456,20 +483,34 @@
 }
 .ob-mcq-confirm { width: 100%; }
 
-.ob-mcq-list { display: flex; flex-direction: column; gap: 26px; }
-.ob-mcq-label {
-  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
-  font-size: 14px; font-weight: 500; color: var(--fg);
-  margin-bottom: 10px; line-height: 1.4;
+/* each question is its own bounded card: numbered header, hairline rule,
+   then the options — so 23 questions read as a list, not a wall of pills */
+.ob-mcq-list { display: flex; flex-direction: column; gap: 12px; }
+.ob-mcq-q {
+  background: var(--card); border: 1px solid var(--hairline);
+  border-radius: 14px; overflow: hidden;
 }
+.ob-mcq-q:focus-within { border-color: var(--hairline-strong); }
+.ob-mcq-label {
+  display: flex; align-items: baseline; gap: 10px;
+  font-size: 13.5px; font-weight: 500; color: var(--fg);
+  line-height: 1.45; padding: 13px 16px;
+  border-bottom: 1px solid var(--hairline);
+  background: rgba(255, 255, 255, 0.015);
+}
+.ob-mcq-text { flex: 1; min-width: 0; }
 .ob-mcq-num {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 21px; height: 21px; border-radius: 50%;
+  width: 21px; height: 21px; border-radius: 50%; align-self: flex-start;
   background: var(--surface); border: 1px solid var(--hairline);
   color: var(--fg-faint); font-size: 11px; font-weight: 600; flex-shrink: 0;
 }
-.ob-mcq-multi-hint { font-size: 11px; font-weight: 400; color: var(--fg-faint); margin-left: auto; }
-.ob-mcq-pills { display: flex; flex-wrap: wrap; gap: 7px; }
+.ob-mcq-multi-hint {
+  flex: none; font-size: 10.5px; font-weight: 400; color: var(--fg-faint);
+  border: 1px solid var(--hairline); border-radius: 999px; padding: 2px 8px;
+  white-space: nowrap;
+}
+.ob-mcq-pills { display: flex; flex-wrap: wrap; gap: 7px; padding: 14px 16px; }
 .ob-mcq-pill {
   appearance: none; cursor: pointer;
   padding: 7px 14px; border-radius: 999px;

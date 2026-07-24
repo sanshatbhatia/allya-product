@@ -1025,18 +1025,82 @@ const ICON = {
   expert: '<svg viewBox="0 0 24 24" fill="none"><path d="M12 11a3.4 3.4 0 1 0 0-6.8A3.4 3.4 0 0 0 12 11Zm-6 8.2a6 6 0 0 1 12 0" stroke="#e7c98a" stroke-width="1.7" stroke-linecap="round"/></svg>',
 };
 
+/* Every capability card names something the founder actually said — the
+   customer, a goal, their edge — so nothing on this page reads generic.
+   `seen` counts prior cards in the same department so two Sales cards
+   don't come out word-for-word identical. */
+function clip(s, n = 9) {
+  const w = (s || '').trim().replace(/\.$/, '').split(/\s+/);
+  return w.length > n ? w.slice(0, n).join(' ') + '…' : w.join(' ');
+}
+/* "We're the only X" → "the only X", so it reads inside our own sentence */
+function deSubject(s) {
+  return (s || '').trim().replace(/^(we(?:'| a)re|we have|we|our|i(?:'m| am))\s+/i, '');
+}
+function personalise(c, d, seen) {
+  const cust = clip(d.customer.lower, 8);
+  const g1 = d.goalList[0] ? lowerFirst(clip(d.goalList[0], 7)) : null;
+  const g2 = d.goalList[1] ? lowerFirst(clip(d.goalList[1], 7)) : null;
+  const edge = d.edge ? lowerFirst(clip(deSubject(d.edge), 9)) : null;
+  const v = seen || 0;
+  switch (c.dept) {
+    case 'Marketing': return v === 0
+      ? `Written for ${cust}${edge ? `, leading with ${edge}` : ''}.`
+      : `A steady drumbeat aimed at ${cust}.`;
+    case 'Sales': return v === 0
+      ? `Aimed at ${cust}${g1 ? ` — pointed at ${g1}` : ''}.`
+      : v === 1
+        ? `Sequences written for ${cust}, in your voice.`
+        : `A real operator pressure-tests the funnel behind ${g1 || 'your growth'}.`;
+    case 'Hiring': return v === 0
+      ? (g2 || g1 ? `Scoped against your goal to ${g2 || g1}.` : `Scoped to the team ${d.companyName} needs next.`)
+      : `A specialist sits in on the shortlist for ${d.companyName}.`;
+    case 'PR': return v === 0
+      ? `Journalists who cover the ${d.category} space, pitched on ${edge || 'what makes you different'}.`
+      : `Your story tightened before it reaches a reporter.`;
+    case 'Ops': return v === 0
+      ? `Built around how ${d.companyName} already works — not a template.`
+      : `Your way of working, turned into playbooks the next hire can run.`;
+    case 'Growth': return `Framed around ${d.rev.badge.toLowerCase()} and where you're taking it.`;
+    default: return c.line;
+  }
+}
+
+/* Concrete proof that Allya was listening — each line quotes their input. */
+function knowledgeNotes(d) {
+  const out = [];
+  out.push({ k: 'Who you serve', v: d.customer.text });
+  out.push({ k: 'Your stage', v: d.rev.badge });
+  if (d.edge) out.push({ k: 'Your edge', v: d.edge });
+  out.push({ k: 'How you sell', v: d.baseSeg === 'B2B' ? 'To other businesses — longer cycles, fewer, bigger deals' : d.baseSeg === 'B2C' ? 'Direct to consumers — volume and voice matter most' : 'Both business and consumer — I keep two tones ready' });
+  out.push({ k: 'What you call it', v: titleCase(d.category) });
+  d.goalList.forEach((g, i) => out.push({ k: `Goal ${i + 1}`, v: g }));
+  return out;
+}
+
 function buildShowcase() {
   const d = derive();
   saveHandoff(d);
 
-  const caps = d.capabilities.map(c => `
+  const perDeptSeen = {};
+  const caps = d.capabilities.map(c => {
+    const seen = perDeptSeen[c.dept] = (perDeptSeen[c.dept] || 0);
+    perDeptSeen[c.dept]++;
+    return `
     <div class="ob-cap ${c.origin === 'expert' ? 'exp' : ''}">
       <span class="ob-cap-ic">${c.origin === 'expert' ? ICON.expert : ICON.agent}</span>
       <div class="ob-cap-copy">
         <div class="ob-cap-title">${escapeHtml(c.title)}</div>
-        <div class="ob-cap-line">${escapeHtml(c.line)}</div>
+        <div class="ob-cap-line">${escapeHtml(personalise(c, d, seen))}</div>
       </div>
       <span class="pill ${c.origin === 'expert' ? 'expert' : ''}">${c.origin === 'expert' ? 'expert' : 'agent'}</span>
+    </div>`;
+  }).join('');
+
+  const notes = knowledgeNotes(d).map(n => `
+    <div class="ob-know-item">
+      <span class="ob-know-k">${escapeHtml(n.k)}</span>
+      <span class="ob-know-v">${escapeHtml(n.v)}</span>
     </div>`).join('');
 
   const goals = d.goalList.length
@@ -1048,23 +1112,12 @@ function buildShowcase() {
     <h1 class="ob-show-lead">${escapeHtml(d.companyName)}, as I understand it.</h1>
     <p class="ob-show-sub">Here's what I took from our conversation — and the work I can start taking off your plate today.</p>
 
-    <div class="ob-essence">
-      <div class="ob-card ob-oneword-card">
-        <div class="ob-kicker">In one word</div>
-        <div class="ob-oneword">${escapeHtml(d.oneWord)}</div>
-        <div class="ob-oneword-note">The through-line I'll keep in mind on everything I do for you.</div>
-      </div>
-      <div class="ob-card ob-pitch">
-        <div class="ob-kicker">Your elevator pitch</div>
-        <p>${escapeHtml(d.pitch)}</p>
-      </div>
+    <div class="ob-card ob-pitch ob-pitch-lead">
+      <div class="ob-kicker">Your elevator pitch</div>
+      <p>${escapeHtml(d.pitch)}</p>
     </div>
 
     <div class="ob-facts">
-      <div class="ob-card ob-fact">
-        <div class="ob-kicker">The base of the business</div>
-        <div class="ob-fact-val"><span class="ob-seg">${escapeHtml(d.baseSeg)}</span><br>${escapeHtml(titleCase(d.category))}</div>
-      </div>
       <div class="ob-card ob-fact">
         <div class="ob-kicker">Your ideal customer</div>
         <div class="ob-fact-val">${escapeHtml(d.customer.text)}</div>
@@ -1073,9 +1126,6 @@ function buildShowcase() {
         <div class="ob-kicker">Where you are</div>
         <div class="ob-fact-val"><span class="ob-seg">${escapeHtml(d.rev.badge)}</span><br>${escapeHtml(d.rev.line)}</div>
       </div>
-    </div>
-
-    <div class="ob-facts" style="grid-template-columns: 1fr;">
       <div class="ob-card ob-fact">
         <div class="ob-kicker">What you're driving at</div>
         ${goals}
@@ -1084,10 +1134,18 @@ function buildShowcase() {
 
     <div class="ob-can">
       <div class="ob-can-head">
-        <h3>What I can do for you</h3>
+        <h3>What I can do for ${escapeHtml(d.companyName)}</h3>
         <span class="ob-split"><b>85%</b> agents · <b>15%</b> real experts · nothing ships without you</span>
       </div>
       <div class="ob-can-grid">${caps}</div>
+    </div>
+
+    <div class="ob-know">
+      <div class="ob-know-head">
+        <h3>What I'm carrying into every task</h3>
+        <span class="ob-know-note">Picked up from your answers — I won't ask twice.</span>
+      </div>
+      <div class="ob-know-grid">${notes}</div>
     </div>
 
     <div class="ob-launch">
@@ -1106,7 +1164,7 @@ function buildShowcase() {
   enter.addEventListener('click', buildMcq);
 
   if (!reduceMotion) {
-    const cards = el('showInner').querySelectorAll('.ob-card, .ob-cap, .ob-launch');
+    const cards = el('showInner').querySelectorAll('.ob-card, .ob-cap, .ob-know, .ob-launch');
     cards.forEach((c, i) => riseIn(c, 18, 60 + i * 55));
     riseIn(el('showInner').querySelector('.ob-show-lead'), 14, 20);
   }
@@ -1245,7 +1303,11 @@ function buildMcq() {
 
     html += `
       <div class="ob-mcq-q">
-        <div class="ob-mcq-label"><span class="ob-mcq-num">${i + 1}</span>${escapeHtml(question)}${multiHint}</div>
+        <div class="ob-mcq-label">
+          <span class="ob-mcq-num">${i + 1}</span>
+          <span class="ob-mcq-text">${escapeHtml(question)}</span>
+          ${multiHint}
+        </div>
         <div class="ob-mcq-pills">${pills}</div>
       </div>`;
   });
