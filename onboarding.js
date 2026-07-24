@@ -338,7 +338,33 @@ function makeBrain(canvas, box) {
   window.addEventListener('resize', () => { if (resize() && reduceMotion) draw(); });
   document.addEventListener('visibilitychange', () => (document.hidden ? stop() : start()));
 
-  return { seedHub, setHubLabel, grow, bloom, fireThought, start, stop,
+  // ---- MCQ hooks: the brain reacts as you refine your answers ----
+  // pulse() sends a thought toward a cluster (or anywhere); the satellite
+  // pair adds / relabels / removes a single labelled leaf so a single-choice
+  // answer shows up as a node that changes when you change your mind.
+  function pulse(id) { fireThought(id ? nodeById[id] : undefined); }
+  function upsertSatellite(parentId, slotKey, label) {
+    const parent = nodeById[parentId] || nodeById.co;
+    if (!parent) return;
+    const id = 'mcq_' + slotKey;
+    let n = nodeById[id];
+    if (n) { n.label = label; }
+    else { n = addNode({ id, label, tier: 2, group: parent.group, parent: parent.id }, parent.id); }
+    layout();
+    excite(n, 0.9);
+    setTimeout(() => { if (nodeById[id]) fireThought(nodeById[id]); }, 60);
+  }
+  function removeSatellite(slotKey) {
+    const id = 'mcq_' + slotKey;
+    const n = nodeById[id]; if (!n) return;
+    const i = nodes.indexOf(n); if (i >= 0) nodes.splice(i, 1);
+    delete nodeById[id];
+    for (let k = edges.length - 1; k >= 0; k--) if (edges[k][0] === id || edges[k][1] === id) edges.splice(k, 1);
+    layout();
+    fireThought();
+  }
+
+  return { seedHub, setHubLabel, grow, bloom, fireThought, start, stop, pulse, upsertSatellite, removeSatellite,
     setThoughts(v) { thoughtsOn = v; }, get nodeCount() { return nodes.length; } };
 }
 
@@ -414,7 +440,8 @@ let brain = null;
 
 const el = (id) => document.getElementById(id);
 const screens = {
-  intro: el('screenIntro'), ask: el('screenAsk'), synth: el('screenSynth'), show: el('screenShow'),
+  intro: el('screenIntro'), ask: el('screenAsk'), miniSynth: el('screenMiniSynth'),
+  show: el('screenShow'), mcq: el('screenMcq'), synth: el('screenSynth'),
 };
 function showScreen(name) {
   Object.entries(screens).forEach(([k, s]) => { s.hidden = k !== name; });
@@ -619,7 +646,7 @@ function afterAnswer(val, files) {
   if (last) {
     obTyping(() => {
       addMsg('allya', escapeHtml(ack));
-      setTimeout(runSynthesis, 720);
+      setTimeout(runMiniSynth, 720);
     }, 800);
     return;
   }
@@ -758,12 +785,36 @@ function ledgerLine(step) {
 }
 
 /* ============================================================
-   Synthesis — the brief "cofounder waking up" moment, then showcase
+   Mini-Synthesis — short brain settling animation, then showcase
+   ============================================================ */
+const MINI_SYNTH_STEPS = ['Building your brain…', 'Mapping what I know…', 'Brain ready ✦'];
+
+function runMiniSynth() {
+  const mount = el('miniSynthBrainMount');
+  mount.innerHTML = '';
+  mount.appendChild(el('brainBox'));
+  showScreen('miniSynth');
+  brain.setThoughts(true);
+  requestAnimationFrame(() => { brain.start(); brain.bloom(); });
+
+  const statusEl = el('miniSynthStatus');
+  let i = 0;
+  const tick = () => {
+    statusEl.textContent = MINI_SYNTH_STEPS[i];
+    if (i > 0) brain.fireThought();
+    i++;
+    if (i < MINI_SYNTH_STEPS.length) setTimeout(tick, 400);
+    else setTimeout(buildShowcase, 500);
+  };
+  tick();
+}
+
+/* ============================================================
+   Full Synthesis — the dramatic "cofounder waking up" moment, then workspace
    ============================================================ */
 const SYNTH_STEPS = ['Waking up your cofounder…', 'Mapping your business', 'Profiling your customer', 'Analysing your revenue', 'Locking in your goals', 'Your AI cofounder is live ✦'];
 
-function runSynthesis() {
-  // hand the live brain over to the full-bleed synthesis stage
+function runFullSynth() {
   const mount = el('synthBrainMount');
   mount.innerHTML = '';
   mount.appendChild(el('brainBox'));
@@ -778,7 +829,7 @@ function runSynthesis() {
     if (i > 0) brain.bloom();
     i++;
     if (i < SYNTH_STEPS.length) setTimeout(tick, i === 1 ? 620 : 520);
-    else setTimeout(buildShowcase, 700);
+    else setTimeout(() => { window.location.href = './index.html'; }, 700);
   };
   tick();
 }
@@ -988,10 +1039,10 @@ function buildShowcase() {
 
     <div class="ob-launch">
       <div class="ob-launch-copy">
-        <div class="t">Your workspace is ready.</div>
-        <div class="s">Walk in and I'll already be working — agents running, one thing waiting on your eyes.</div>
+        <div class="t">Looking good — let me refine it.</div>
+        <div class="s">A few quick multiple-choice questions so I can dial in the details.</div>
       </div>
-      <button class="cta ob-enter" id="enterBtn">Enter your workspace
+      <button class="cta ob-enter" id="enterBtn">Continue
         <svg viewBox="0 0 24 24" fill="none" width="17" height="17"><path d="M4 12h15M13 6l6 6-6 6" stroke="#0a0a0a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
     </div>`;
@@ -999,7 +1050,7 @@ function buildShowcase() {
   showScreen('show');
   el('screenShow').scrollTop = 0;
   const enter = el('enterBtn'); pressable(enter, 0.97);
-  enter.addEventListener('click', () => { window.location.href = './index.html'; });
+  enter.addEventListener('click', buildMcq);
 
   if (!reduceMotion) {
     const cards = el('showInner').querySelectorAll('.ob-card, .ob-cap, .ob-launch');
@@ -1008,13 +1059,230 @@ function buildShowcase() {
   }
 }
 
+/* ============================================================
+   MCQ — 23 quick refinement questions shown after the showcase
+   ============================================================ */
+const MCQ_QUESTIONS = [
+  { id: '6', title: 'nature_of_business', question: 'Which of these best describes the nature of your business?', answers: ['B2C (You sell directly to consumers)','D2C (Digitally native brand that manufactures and sells directly)','B2B (You sell to other businesses)','B2G (You sell to government or public institutions)','Marketplace (You connect buyers and sellers or service providers)','Content-based business (e.g. blogs, newsletters, video channels, etc.)','Community-led business (monetizing or supporting a user/member group)','NGO / Social Impact initiative','Financial / Insurance / Investment Business (e.g. NBFCs, insurers, funds)','Franchise / Licensing Business (you license a brand/process to others)','Affiliate / Referral Monetization (e.g. affiliate networks, coupon sites)','Open-source or Community-funded Project (with free core offering)','Events / Venue / Experience-based Business (e.g. concerts, weddings)','Real Estate / Property Business (e.g. developers, brokers, rental income)','Supply Chain / Logistics / Transport Services (e.g. freight, warehousing)','Research, Lab, or Technical Testing Services (e.g. biotech, analytics labs)','Regulated / Government Contracting (e.g. infra, defense, PPPs)','Infrastructure / Utilities / Telecom / Cloud Services','Other / Still Figuring It Out'], multiSelect: true },
+  { id: '7', title: 'business_offering', question: 'What do you primarily offer or deliver?', answers: ['Physical products','Digital products','Software or SaaS tool','One-time services','Ongoing or monthly services','Platform or marketplace commissions','Memberships / subscriptions / paid communities','Ad-supported content','Freemium model','Event space or time-based booking','Licensing, brokerage, or leasing','Data, research, or testing outcomes','Infrastructure access or system uptime','Other'], multiSelect: true },
+  { id: '8', title: 'business_stage', question: 'What stage is your business currently at?', answers: ['Just an idea','Validated idea','MVP or early version is live','Fully launched','Revenue-generating','Growing steadily and scaling operations'] },
+  { id: '9', title: 'monetization_status', question: 'Are you monetizing anything right now?', answers: ['No, not yet monetizing','Testing monetization with a few early users','Selling or earning actively but still early-stage','Monetization is stable or growing','Monetization is not the goal at this stage'] },
+  { id: '10', title: 'operational_needs', question: 'Are you currently managing any of the following areas?', answers: ['Inventory or product fulfillment','Recurring billing / subscription payments','Client onboarding or project servicing','Product / app / platform development','Paid promotions / advertising / affiliate campaigns','Community engagement or moderation','Hiring or team coordination','Lead generation or CRM tracking','Event, space, or calendar bookings','Regulatory, licensing, or compliance workflows','Other operational needs'], multiSelect: true },
+  { id: '11', title: 'target_audience', question: 'Who is your primary target audience?', answers: ['Consumers','Businesses','Institutions','Professionals','Communities or groups','Still figuring it out'] },
+  { id: '12', title: 'audience_profile_1', question: "What best describes your audience's age group?", answers: ['Teenagers','Young Adults','Adults','Mid-career','Seniors'], multiSelect: true },
+  { id: '13', title: 'audience_profile_2', question: "What best describes your audience's geography?", answers: ['Urban','Tier 2/3 towns','Rural/Semi-urban','International'], multiSelect: true },
+  { id: '14', title: 'audience_profile_3', question: "What best describes your audience's language preference?", answers: ['English','Hindi','Hinglish','Other'], multiSelect: true },
+  { id: '15', title: 'audience_profile_4', question: "What best describes your audience's device usage?", answers: ['Mobile','Desktop/Laptop','Both equally'], multiSelect: true },
+  { id: '16', title: 'buying_role', question: 'What role does your audience play in the buying decision?', answers: ['They are the user AND the buyer','They are the buyer but not the user','They are influencers','Still unclear'] },
+  { id: '17', title: 'audience_motivation', question: 'What motivates your audience to buy or engage?', answers: ['Price or affordability','Aspirational lifestyle / image','Convenience or time-saving','FOMO','Expert credibility or trust','Community belonging','Functional outcome / need','Still figuring this out'], multiSelect: true },
+  { id: '18', title: 'purchase_details_or_organizational_size', bifurcation: { b2cQuestion: 'Who is the primary purchaser?', b2cAnswers: ['End-user','Parent','Household decision-maker','Gift-giver','Group or shared decision','Other'], b2bQuestion: 'What is the Organization Size?', b2bAnswers: ['1-5','6-20','21-100','101-500','500+'] } },
+  { id: '19', title: 'decision_maker_or_product_users', bifurcation: { b2cQuestion: 'Who ultimately decides to buy?', b2cAnswers: ['Spontaneous decision','Family discussion','Research-driven','Promo-triggered','Peer influence'], b2bQuestion: 'Who uses the product/service?', b2bAnswers: ['End-users','Admins','Managers','Mixed teams'] } },
+  { id: '20', title: 'purchase_or_decision_influencers', bifurcation: { b2cQuestion: 'Who influences the purchase?', b2cAnswers: ['Friends','Influencers','Reviews','Brand community','In-store staff','Other'], b2bQuestion: 'Who influences the decision?', b2bAnswers: ['End-users','Technical evaluators','Finance team','Operations team','Sales team','External consultants'] } },
+  { id: '21', title: 'decision_cycle_or_process', bifurcation: { b2cQuestion: "What's the typical decision cycle?", b2cAnswers: ['Impulse','Quick','Considered','Major purchase decision'], b2bQuestion: 'How is a decision made?', b2bAnswers: ['Solo','Small group','Large committee','Community vote'] } },
+  { id: '22', title: 'purchase_drivers_or_role_priorities', bifurcation: { b2cQuestion: 'Who are the key purchase drivers by role?', b2cAnswers: ['End-user','Household / family','Gift-giver','Influencer (social or peer)'], b2bQuestion: 'What is the role-specific priority?', b2bAnswers: ['Buyer','End-user','Technical evaluator','Influencer'] } },
+  { id: '23', title: 'price_tier', question: 'Which price/value tier best describes your brand?', answers: ['Mass market / Budget-friendly','Mid-market / Affordable quality','Premium','Luxury','Ultra-luxury'] },
+  { id: '24', title: 'brand_personality', question: 'Which three brand personality traits resonate most with you?', answers: ['Friendly & Approachable','Bold & Disruptive','Elegant & Sophisticated','Fun & Playful','Trustworthy & Reliable','Minimalist & Clean','Innovative & Cutting-edge','Ethical & Sustainable'], multiSelect: true },
+  { id: '25', title: 'brand_voice', question: 'What tone & voice should we adopt for your brand?', answers: ['Casual','Professional','Witty','Inspirational','Direct','Empathetic'] },
+  { id: '26', title: 'key_metrics', question: 'Which of these supporting metrics matter to you?', answers: ['Website traffic','Email growth','Conversion rate','AOV','LTV','CAC','Margin','MAU/DAU','Churn','NPS'], multiSelect: true },
+  { id: '27', title: 'feedback', question: 'What feedback have you received so far?', answers: ['Testimonials','Survey responses','Informal feedback','No feedback yet'] },
+  { id: '28', title: 'team_size', question: 'How big is your current team?', answers: ['Solo founder','2-5 people','6-20','21-50','50+'] },
+];
+
+const mcqSelections = {};
+
+/* Which cluster each MCQ speaks to — a pill toggle sends a thought there so
+   the brain visibly reacts even when the answer doesn't spawn a node. */
+const MCQ_CLUSTER = {
+  '6': 'business', '7': 'business', '8': 'revenue', '9': 'revenue', '10': 'business',
+  '11': 'customer', '12': 'customer', '13': 'customer', '14': 'customer', '15': 'customer',
+  '16': 'customer', '17': 'customer', '18': 'customer', '19': 'customer', '20': 'customer',
+  '21': 'customer', '22': 'customer', '23': 'revenue', '24': 'edge', '25': 'edge',
+  '26': 'goals', '27': 'market', '28': 'business',
+};
+
+/* Single-choice questions that plant a labelled leaf in the brain — changing
+   the answer relabels that same leaf, deselecting removes it. slot keeps the
+   node identity stable across changes. */
+const MCQ_BRAIN = {
+  '8':  { cluster: 'revenue',  slot: 'stage', short: (a) => shortLabel(a, 3) },
+  '11': { cluster: 'customer', slot: 'aud',   short: (a) => shortLabel(a, 2) },
+  '16': { cluster: 'customer', slot: 'role',  short: (a) => shortLabel(a, 3) },
+  '23': { cluster: 'revenue',  slot: 'price', short: (a) => shortLabel(a, 2) },
+  '25': { cluster: 'edge',     slot: 'voice', short: (a) => a },
+};
+
+const uniq = (a) => [...new Set(a)];
+
+/* Prefill the MCQs from what the founder already told us in the chat, so the
+   page opens already answered and they only correct what's wrong. Deterministic
+   heuristics off answers + derive() — the same source the showcase reads. */
+function computePrefill() {
+  const pf = {};
+  const market = answers.market;                 // 'Businesses' | 'Consumers' | 'Both'
+  const isB2B = market === 'Businesses';
+  const d = derive();
+  const cat = (d.category || '').toLowerCase();
+  const badge = d.rev.badge;
+
+  const nb = [];
+  if (market === 'Businesses') nb.push('B2B (You sell to other businesses)');
+  else if (market === 'Consumers') nb.push('B2C (You sell directly to consumers)');
+  else { nb.push('B2C (You sell directly to consumers)', 'B2B (You sell to other businesses)'); }
+  if (/consumer brand|d2c|dtc/.test(cat)) nb.push('D2C (Digitally native brand that manufactures and sells directly)');
+  if (/marketplace/.test(cat)) nb.push('Marketplace (You connect buyers and sellers or service providers)');
+  if (/media|content|story/.test(cat)) nb.push('Content-based business (e.g. blogs, newsletters, video channels, etc.)');
+  if (/community/.test(cat)) nb.push('Community-led business (monetizing or supporting a user/member group)');
+  pf['6'] = uniq(nb);
+
+  const off = [];
+  if (/saas|software/.test(cat)) off.push('Software or SaaS tool');
+  if (/consumer brand|d2c|retail|brand/.test(cat)) off.push('Physical products');
+  if (/services|agency|consult|craft/.test(cat)) off.push('Ongoing or monthly services');
+  if (/media|content|story/.test(cat)) off.push('Ad-supported content');
+  if (/marketplace/.test(cat)) off.push('Platform or marketplace commissions');
+  if (!off.length) off.push('Digital products');
+  pf['7'] = uniq(off);
+
+  pf['8'] = badge === 'Pre-revenue' ? 'MVP or early version is live'
+    : badge === 'Early revenue' ? 'Revenue-generating'
+    : 'Growing steadily and scaling operations';
+  pf['9'] = badge === 'Pre-revenue' ? 'No, not yet monetizing'
+    : badge === 'Early revenue' ? 'Selling or earning actively but still early-stage'
+    : 'Monetization is stable or growing';
+  pf['10'] = ['Lead generation or CRM tracking', 'Hiring or team coordination', 'Paid promotions / advertising / affiliate campaigns'];
+  pf['11'] = isB2B ? 'Businesses' : 'Consumers';
+  pf['15'] = ['Mobile'];
+  pf['16'] = isB2B ? 'They are the buyer but not the user' : 'They are the user AND the buyer';
+  pf['23'] = 'Mid-market / Affordable quality';
+  pf['25'] = isB2B ? 'Professional' : 'Casual';
+  pf['28'] = 'Solo founder';
+  return pf;
+}
+
+/* reflect the current single-choice selection into the brain (or clear it) */
+function reflectSatellite(qid) {
+  const bm = MCQ_BRAIN[qid]; if (!bm || !brain) return;
+  const sel = mcqSelections[qid];
+  if (sel && !Array.isArray(sel)) brain.upsertSatellite(bm.cluster, bm.slot, bm.short(sel));
+  else brain.removeSatellite(bm.slot);
+}
+
+function buildMcq() {
+  const isB2B = answers.market === 'Businesses';
+  const inner = el('mcqInner');
+
+  let html = `
+    <div class="ob-mcq-head">
+      <div class="ob-eyebrow"><span class="ob-eyebrow-dot"></span> Refine your brain</div>
+      <h2 class="ob-mcq-title">A few more details.</h2>
+      <p class="ob-mcq-sub">Pick what fits — it sharpens how I think about your business.</p>
+    </div>
+    <div class="ob-mcq-list">`;
+
+  MCQ_QUESTIONS.forEach((q, i) => {
+    let question, qAnswers;
+    if (q.bifurcation) {
+      question = isB2B ? q.bifurcation.b2bQuestion : q.bifurcation.b2cQuestion;
+      qAnswers = isB2B ? q.bifurcation.b2bAnswers : q.bifurcation.b2cAnswers;
+    } else {
+      question = q.question;
+      qAnswers = q.answers;
+    }
+
+    const multiHint = q.multiSelect ? '<span class="ob-mcq-multi-hint">Select all that apply</span>' : '';
+    const pills = qAnswers.map(a =>
+      `<button type="button" class="ob-mcq-pill${q.multiSelect ? ' multi' : ''}" data-qid="${q.id}" data-answer="${escapeHtml(a)}">${escapeHtml(a)}</button>`
+    ).join('');
+
+    html += `
+      <div class="ob-mcq-q">
+        <div class="ob-mcq-label"><span class="ob-mcq-num">${i + 1}</span>${escapeHtml(question)}${multiHint}</div>
+        <div class="ob-mcq-pills">${pills}</div>
+      </div>`;
+  });
+
+  html += '</div>';
+  inner.innerHTML = html;
+
+  // ---- prefill from the chat answers, so the page opens already answered ----
+  const prefill = computePrefill();
+  Object.entries(prefill).forEach(([qid, val]) => {
+    const values = Array.isArray(val) ? val : [val];
+    inner.querySelectorAll(`.ob-mcq-pill[data-qid="${qid}"]`).forEach(pill => {
+      if (values.includes(pill.dataset.answer)) pill.classList.add('selected');
+    });
+    mcqSelections[qid] = Array.isArray(val) ? val.slice() : val;
+  });
+
+  // pill click handlers — update the selection, then move the brain
+  inner.querySelectorAll('.ob-mcq-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      const qid = pill.dataset.qid;
+      const answer = pill.dataset.answer;
+      const q = MCQ_QUESTIONS.find(x => x.id === qid);
+
+      if (q && q.multiSelect) {
+        pill.classList.toggle('selected');
+        if (!mcqSelections[qid]) mcqSelections[qid] = [];
+        if (pill.classList.contains('selected')) {
+          mcqSelections[qid].push(answer);
+        } else {
+          mcqSelections[qid] = mcqSelections[qid].filter(a => a !== answer);
+        }
+      } else {
+        // single-select: deselect siblings
+        pill.parentElement.querySelectorAll('.ob-mcq-pill').forEach(p => p.classList.remove('selected'));
+        pill.classList.add('selected');
+        mcqSelections[qid] = answer;
+      }
+
+      // the brain reacts: mapped single-choices plant/relabel a leaf, everything
+      // else sends a thought toward the cluster the question belongs to
+      if (MCQ_BRAIN[qid] && !(q && q.multiSelect)) reflectSatellite(qid);
+      else if (brain) brain.pulse(MCQ_CLUSTER[qid]);
+    });
+  });
+
+  showScreen('mcq');
+  el('screenMcq').scrollTop = 0;
+
+  // hand the brain to the MCQ page and let the prefilled answers shape it
+  const mount = el('mcqBrainMount');
+  if (mount) {
+    mount.innerHTML = '';
+    mount.appendChild(el('brainBox'));
+    el('brainSub').textContent = 'refining with your answers…';
+    brain.setThoughts(true);
+    brain.start();
+    // fit the canvas to its new column now — the brain's own resize probe is
+    // rAF-driven and won't fire in a backgrounded tab; the window 'resize'
+    // listener runs synchronously and re-fits + re-centres the graph
+    window.dispatchEvent(new Event('resize'));
+    // seed the brain with the prefilled single-choice answers — setTimeout,
+    // NOT rAF, so a backgrounded tab still plants them
+    Object.keys(MCQ_BRAIN).forEach((qid, i) => setTimeout(() => reflectSatellite(qid), 200 + i * 220));
+  }
+
+  if (!reduceMotion) {
+    inner.querySelectorAll('.ob-mcq-q').forEach((q, i) => riseIn(q, 14, 40 + i * 30));
+  }
+}
+
+// MCQ confirm button
+pressable(el('mcqConfirmBtn'), 0.97);
+el('mcqConfirmBtn').addEventListener('click', () => {
+  saveHandoff(derive(), mcqSelections);
+  runFullSynth();
+});
+
 /* ---- persist for the workspace to pick up ---- */
-function saveHandoff(d) {
+function saveHandoff(d, mcqAnswers) {
   try {
     localStorage.setItem('allya.onboarding', JSON.stringify({
       company: d.companyName, base: d.baseSeg, category: d.category, oneWord: d.oneWord,
       customer: d.customer.text, revenueBadge: d.rev.badge, goals: d.goalList,
-      pitch: d.pitch, edge: d.edge, answers, attachments, at: Date.now(),
+      pitch: d.pitch, edge: d.edge, answers, attachments,
+      mcqAnswers: mcqAnswers || null, at: Date.now(),
     }));
   } catch (e) { /* private mode — non-fatal */ }
 }

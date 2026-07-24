@@ -86,12 +86,12 @@
     </div>
   </section>
 
-  <!-- ================= 3 · Synthesis ================= -->
-  <section class="ob-screen ob-synth" id="screenSynth" hidden>
-    <div class="ob-synth-brain" id="synthBrainMount"></div>
-    <div class="ob-synth-status">
+  <!-- ================= 3 · Mini-Synthesis ================= -->
+  <section class="ob-screen ob-synth" id="screenMiniSynth" hidden>
+    <div class="ob-synth-brain" id="miniSynthBrainMount"></div>
+    <div class="ob-synth-status ob-mini-synth">
       <span class="ob-synth-spark">✦</span>
-      <span id="synthStatus">Waking up your cofounder…</span>
+      <span id="miniSynthStatus">Building your brain…</span>
     </div>
   </section>
 
@@ -99,6 +99,35 @@
   <section class="ob-screen ob-show" id="screenShow" hidden>
     <div class="ob-show-inner" id="showInner">
       <!-- rendered by JS -->
+    </div>
+  </section>
+
+  <!-- ================= 5 · MCQ ================= -->
+  <section class="ob-screen ob-mcq" id="screenMcq" hidden>
+    <div class="ob-mcq-layout">
+      <div class="ob-mcq-inner" id="mcqInner">
+        <!-- rendered by JS -->
+      </div>
+      <aside class="ob-mcq-brain">
+        <div class="ob-mcq-brain-mount" id="mcqBrainMount">
+          <!-- the brain (id="brainBox") is moved in here so it reacts as you refine -->
+        </div>
+        <p class="ob-mcq-brain-hint">Watch it shift as you adjust your answers.</p>
+      </aside>
+    </div>
+    <div class="ob-mcq-footer">
+      <button class="cta ob-mcq-confirm" id="mcqConfirmBtn">Confirm &amp; build your workspace
+        <svg viewBox="0 0 24 24" fill="none" width="17" height="17"><path d="M4 12h15M13 6l6 6-6 6" stroke="#0a0a0a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <!-- ================= 6 · Full Synthesis ================= -->
+  <section class="ob-screen ob-synth" id="screenSynth" hidden>
+    <div class="ob-synth-brain" id="synthBrainMount"></div>
+    <div class="ob-synth-status">
+      <span class="ob-synth-spark">✦</span>
+      <span id="synthStatus">Waking up your cofounder…</span>
     </div>
   </section>
 
