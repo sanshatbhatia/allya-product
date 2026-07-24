@@ -783,8 +783,10 @@ button { font-family: inherit; color: inherit; }
 }
 .sheet-foot .cta { flex: 1; }
 
-/* shipped toast */
-.shipped {
+/* shipped toast — its own class, NOT a bare `.shipped`: work rows carry
+   `work-row shipped` for their status, and a bare selector pinned every
+   shipped row to the bottom of the screen as a floating pill */
+.ship-toast {
   position: fixed; left: 50%; bottom: 26px; z-index: 60;
   transform: translate(-50%, 24px);
   opacity: 0;
@@ -795,7 +797,7 @@ button { font-family: inherit; color: inherit; }
   display: flex; align-items: center; gap: 9px;
   pointer-events: none; will-change: transform, opacity;
 }
-.shipped .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 8px rgba(145,212,95,0.6); }
+.ship-toast .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 8px rgba(145,212,95,0.6); }
 
 /* ============================================================
    Mobile: tabs + bottom sheet
