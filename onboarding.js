@@ -94,6 +94,10 @@ function makeBrain(canvas, box) {
   let pulses = [], ripples = [], thoughtClock = 0;
   const tSeed = Math.random() * 1000;
 
+  // view: the whole graph scales about the centre of the box. The finale
+  // ramps this up so the brain grows as it "wakes"; z eases toward zT.
+  const view = { z: 1, zT: 1 };
+
   const R = { 0: 8.5, 1: 5, 2: 3.3 };
   const nodeR = (n) => R[n.tier] * S * (0.2 + n.rev * 0.8) * (1 + n.ex * 0.5);
 
@@ -235,6 +239,8 @@ function makeBrain(canvas, box) {
     const fr = Math.exp(-DAMP * dt);
     for (const n of nodes) { if (n === dragNode) continue; n.vx *= fr; n.vy *= fr; n.x += n.vx * dt; n.y += n.vy * dt; }
     for (const n of nodes) n.ex = Math.max(0, n.ex - dt * 1.1);
+    // ease the view scale (frame-rate independent, same form as the workspace camera)
+    view.z += (view.zT - view.z) * (1 - Math.exp(-6.5 * dt));
   }
 
   function hexA(hex, a) { const h = hex.replace('#', ''); const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16); return `rgba(${r},${g},${b},${clamp(a, 0, 1)})`; }
@@ -243,6 +249,10 @@ function makeBrain(canvas, box) {
   function draw() {
     ctx.clearRect(0, 0, W, H);
     const time = performance.now() / 1000;
+    // the graph scales about the centre of the box; hairlines are divided by
+    // view.z below so strokes keep their weight as it grows
+    ctx.save();
+    ctx.translate(W / 2, H / 2); ctx.scale(view.z, view.z); ctx.translate(-W / 2, -H / 2);
     for (const [aid, bid] of edges) {
       const a = nodeById[aid], b = nodeById[bid];
       const vis = Math.min(a.rev, b.rev), lit = Math.max(a.ex, b.ex);
@@ -254,12 +264,12 @@ function makeBrain(canvas, box) {
       } else {
         ctx.strokeStyle = hexA(GROUPS[a.group] || '#91d45f', 0.05 * vis);
       }
-      ctx.lineWidth = (0.8 + lit * 1.2) * S;
+      ctx.lineWidth = (0.8 + lit * 1.2) * S / view.z;
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
     }
     for (const rp of ripples) {
       const rr = rp.r0 + rp.t * 42 * S;
-      ctx.strokeStyle = hexA(rp.col, (1 - rp.t) * 0.4); ctx.lineWidth = 1.4 * S;
+      ctx.strokeStyle = hexA(rp.col, (1 - rp.t) * 0.4); ctx.lineWidth = 1.4 * S / view.z;
       ctx.beginPath(); ctx.arc(rp.x, rp.y, rr, 0, TAU); ctx.stroke();
     }
     for (const s of pulses) {
@@ -296,12 +306,13 @@ function makeBrain(canvas, box) {
         ctx.fillStyle = cg;
       }
       ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, TAU); ctx.fill();
-      if (hub) { ctx.lineWidth = 1.5 * S; ctx.strokeStyle = hexA('#eafbdc', 0.6 * n.rev); ctx.stroke(); }
+      if (hub) { ctx.lineWidth = 1.5 * S / view.z; ctx.strokeStyle = hexA('#eafbdc', 0.6 * n.rev); ctx.stroke(); }
       const lAlpha = clamp(((hub ? 0.92 : n.tier === 1 ? 0.62 : 0.4) + n.ex * 0.7) * n.rev, 0, 1);
       ctx.font = `${hub ? 600 : 500} ${(hub ? 13 : n.tier === 1 ? 11.5 : 10) * clamp(S, 0.9, 1.25)}px "Inter Tight", system-ui, sans-serif`;
       ctx.fillStyle = hexA(n.tier === 2 ? '#c7ccd4' : '#f3f4f6', lAlpha);
       ctx.fillText(n.label, n.x, n.y + r + 3 * S);
     }
+    ctx.restore();
   }
 
   let raf = 0, last = 0, thoughtsOn = true, boxHidden = false, probeAt = 0;
@@ -317,6 +328,7 @@ function makeBrain(canvas, box) {
     if (boxHidden) { last = now; return; }
     // 30fps while something is happening, ~15fps for the idle drift
     const active = dragNode || hoverNode || pulses.length || ripples.length ||
+      Math.abs(view.zT - view.z) > 0.002 ||
       nodes.some(n => n.ex > 0.02 || n.rev < 0.98);
     if (now - last < (active ? 33 : 66)) return;
     let dt = (now - last) / 1000; last = now;
@@ -365,6 +377,22 @@ function makeBrain(canvas, box) {
   }
 
   return { seedHub, setHubLabel, grow, bloom, fireThought, start, stop, pulse, upsertSatellite, removeSatellite,
+    // the finale ramps this; snap instantly under reduced motion
+    setZoom(z, snap) { view.zT = z; if (snap || reduceMotion) view.z = z; },
+    get zoom() { return view.z; },
+    // dev: force N settled frames + a draw (a backgrounded tab throttles rAF
+    // to zero, so timed motion can't be observed without this)
+    tickOnce(frames = 1, dt = 1 / 60) {
+      if (!resize()) return;
+      for (let i = 0; i < frames; i++) {
+        sim(dt);
+        for (const s of pulses) { if (s.delay > 0) s.delay -= dt; else { s.t += dt / s.dur; if (s.t >= 0.5 && !s._hit) { s._hit = true; excite(s.b, 0.6); } } }
+        pulses = pulses.filter(s => s.t < 1);
+        for (const rp of ripples) rp.t += dt / 0.7;
+        ripples = ripples.filter(rp => rp.t < 1);
+      }
+      draw();
+    },
     setThoughts(v) { thoughtsOn = v; }, get nodeCount() { return nodes.length; } };
 }
 
@@ -791,11 +819,18 @@ const MINI_SYNTH_STEPS = ['Building your brain…', 'Mapping what I know…', 'B
 
 function runMiniSynth() {
   const mount = el('miniSynthBrainMount');
-  mount.innerHTML = '';
-  mount.appendChild(el('brainBox'));
+  const bb = el('brainBox');
+  // appendChild moves it; never clear the mount (that destroys the brain if
+  // it already lives here)
+  if (bb.parentElement !== mount) mount.appendChild(bb);
   showScreen('miniSynth');
   brain.setThoughts(true);
-  requestAnimationFrame(() => { brain.start(); brain.bloom(); });
+  brain.setZoom(1, true);            // a sketch — no growth, no drama
+  // no rAF wrapper: a backgrounded tab throttles rAF to zero and strands the
+  // flow. Start directly, then re-fit the canvas to its new container.
+  brain.start();
+  window.dispatchEvent(new Event('resize'));
+  brain.bloom();
 
   const statusEl = el('miniSynthStatus');
   let i = 0;
@@ -814,22 +849,40 @@ function runMiniSynth() {
    ============================================================ */
 const SYNTH_STEPS = ['Waking up your cofounder…', 'Mapping your business', 'Profiling your customer', 'Analysing your revenue', 'Locking in your goals', 'Your AI cofounder is live ✦'];
 
+/* beats slow toward the end so it builds rather than lists */
+const SYNTH_HOLD = [620, 700, 780, 860, 940, 1100];
+
 function runFullSynth() {
   const mount = el('synthBrainMount');
-  mount.innerHTML = '';
-  mount.appendChild(el('brainBox'));
+  const bb = el('brainBox');
+  if (bb.parentElement !== mount) mount.appendChild(bb);
   showScreen('synth');
+  const screen = el('screenSynth');
+  screen.classList.remove('is-finale');
   brain.setThoughts(true);
-  requestAnimationFrame(() => { brain.start(); brain.bloom(); });
+  brain.setZoom(1, true);
+  brain.start();
+  window.dispatchEvent(new Event('resize'));
+  brain.bloom();
 
   const statusEl = el('synthStatus');
+  const last = SYNTH_STEPS.length - 1;
   let i = 0;
   const tick = () => {
     statusEl.textContent = SYNTH_STEPS[i];
     if (i > 0) brain.bloom();
+    // the graph grows as it wakes, then pushes in on the hub for the finale
+    brain.setZoom(i === last ? 1.6 : 1 + (i / last) * 0.22);
+    if (i === last) {
+      // final flare: a dense burst of thoughts, then the lime wash carries
+      // us into the workspace
+      for (let k = 0; k < 3; k++) setTimeout(() => brain.bloom(), k * 130);
+      screen.classList.add('is-finale');
+    }
     i++;
-    if (i < SYNTH_STEPS.length) setTimeout(tick, i === 1 ? 620 : 520);
-    else setTimeout(() => { window.location.href = './index.html'; }, 700);
+    if (i <= last) setTimeout(tick, SYNTH_HOLD[i - 1]);
+    // hold on the last line while the wash fades up, then land in the workspace
+    else setTimeout(() => { window.location.href = './index.html'; }, reduceMotion ? 200 : SYNTH_HOLD[last]);
   };
   tick();
 }
