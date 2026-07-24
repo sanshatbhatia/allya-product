@@ -272,7 +272,7 @@ function renderCanvas() {
   const bottom = document.getElementById('canvasBottom');
   if (!top || !bottom) return;
 
-  const greet = `Morning. Here's what I know about ${ONB.company || 'you'} — flag anything that's off.`;
+  const greet = `Morning. Here's what I know about ${(ONB && ONB.company) || 'you'} — flag anything that's off.`;
 
   const tabs = ['today', 'yesterday', 'last-week'].map(t =>
     `<button class="kf-tab${kfFilter === t && !kfCalDate ? ' active' : ''}" data-kf-tab="${t}">${t === 'last-week' ? 'Last week' : t.charAt(0).toUpperCase() + t.slice(1)}</button>`
