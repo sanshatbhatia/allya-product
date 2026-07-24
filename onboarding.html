@@ -102,23 +102,29 @@
     </div>
   </section>
 
-  <!-- ================= 5 · MCQ ================= -->
+  <!-- ================= 5 · MCQ (mirrors the ask screen: questions left, brain right) ================= -->
   <section class="ob-screen ob-mcq" id="screenMcq" hidden>
-    <div class="ob-mcq-layout">
-      <div class="ob-mcq-inner" id="mcqInner">
-        <!-- rendered by JS -->
-      </div>
-      <aside class="ob-mcq-brain">
-        <div class="ob-mcq-brain-mount" id="mcqBrainMount">
-          <!-- the brain (id="brainBox") is moved in here so it reacts as you refine -->
+    <div class="ob-progress"><div class="ob-progress-bar" style="width:100%"></div></div>
+    <div class="ob-mcq-grid">
+      <!-- left: the questions, scrolling like the conversation -->
+      <div class="ob-mcq-col">
+        <div class="ob-chat-head">
+          <span class="avatar">A</span>
+          <span class="ob-ask-name">Refine your brain <span class="ob-ask-role">· a few more details</span></span>
         </div>
-        <p class="ob-mcq-brain-hint">Watch it shift as you adjust your answers.</p>
-      </aside>
-    </div>
-    <div class="ob-mcq-footer">
-      <button class="cta ob-mcq-confirm" id="mcqConfirmBtn">Confirm &amp; build your workspace
-        <svg viewBox="0 0 24 24" fill="none" width="17" height="17"><path d="M4 12h15M13 6l6 6-6 6" stroke="#0a0a0a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
+        <div class="ob-mcq-scroll" id="mcqInner">
+          <!-- rendered by JS -->
+        </div>
+        <div class="ob-mcq-foot">
+          <button class="cta ob-mcq-confirm" id="mcqConfirmBtn">Confirm &amp; build your workspace
+            <svg viewBox="0 0 24 24" fill="none" width="17" height="17"><path d="M4 12h15M13 6l6 6-6 6" stroke="#0a0a0a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </div>
+      <!-- right: the brain fills the whole column, like the initial onboarding -->
+      <div class="ob-brain-col" id="mcqBrainMount">
+        <!-- the brain (id="brainBox") is moved in here so it reacts as you refine -->
+      </div>
     </div>
   </section>
 

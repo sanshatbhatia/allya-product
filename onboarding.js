@@ -1172,11 +1172,7 @@ function buildMcq() {
   const inner = el('mcqInner');
 
   let html = `
-    <div class="ob-mcq-head">
-      <div class="ob-eyebrow"><span class="ob-eyebrow-dot"></span> Refine your brain</div>
-      <h2 class="ob-mcq-title">A few more details.</h2>
-      <p class="ob-mcq-sub">Pick what fits — it sharpens how I think about your business.</p>
-    </div>
+    <p class="ob-mcq-intro">Pick what fits — it sharpens how I think about your business. I've pre-filled what I could from our chat; change anything that's off and watch the brain shift.</p>
     <div class="ob-mcq-list">`;
 
   MCQ_QUESTIONS.forEach((q, i) => {
@@ -1244,13 +1240,13 @@ function buildMcq() {
   });
 
   showScreen('mcq');
-  el('screenMcq').scrollTop = 0;
+  const scroller = el('mcqInner'); if (scroller) scroller.scrollTop = 0;
 
   // hand the brain to the MCQ page and let the prefilled answers shape it
   const mount = el('mcqBrainMount');
-  if (mount) {
-    mount.innerHTML = '';
-    mount.appendChild(el('brainBox'));
+  const bb = el('brainBox');
+  if (mount && bb) {
+    if (bb.parentElement !== mount) mount.appendChild(bb);   // appendChild moves it; never clear the mount (that would destroy the brain if it's already here)
     el('brainSub').textContent = 'refining with your answers…';
     brain.setThoughts(true);
     brain.start();
