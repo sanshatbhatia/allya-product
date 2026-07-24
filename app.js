@@ -9,6 +9,9 @@
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const isDesktop = window.matchMedia('(min-width: 900px)');
 
+/* handoff from onboarding — personalizes the brain + greeting if present */
+const ONB = (() => { try { return JSON.parse(localStorage.getItem('allya.onboarding') || 'null'); } catch { return null; } })();
+
 /* ---- Spring: Apple's two knobs (response + damping ratio), numerically
    integrated so it can be re-targeted mid-flight from the current value
    and velocity — the property that makes interruption clean. */
@@ -192,39 +195,101 @@ const DAY_PLAN = [
   { time: '15:00', what: 'Ops interview — Ananya R.', pill: 'brief ready' },
   { time: '—', what: 'Nothing else. I kept your afternoon clear on purpose.', quiet: true },
 ];
-let decisionDeferred = false;
+/* ============================================================
+   Knowledge feed — living single-liners, time-filtered,
+   scrollable box showing 4 at a time. Grows with every conversation.
+   ============================================================ */
+const KNOWLEDGE_KEY = 'allya.knowledge';
+const CAL_SVG = '<svg class="kf-cal-icon" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M2 6.5h12M5 1.5v3M11 1.5v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>';
+const FLAG_SVG = '<svg class="kf-flag-icon" viewBox="0 0 16 16" fill="none"><path d="M3 2v12M3 2l9 4-9 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+function loadKnowledge() {
+  try { return JSON.parse(localStorage.getItem(KNOWLEDGE_KEY) || 'null'); } catch { return null; }
+}
+
+function seedKnowledge() {
+  const now = Date.now();
+  const day = 86400000;
+  const facts = [
+    // today — insightful, not obvious
+    { id: 'b1', text: 'You respond to PR approvals faster than hiring decisions', source: 'observed', when: 'today', ts: now, flagged: false },
+    { id: 'b2', text: 'Newsletter open rate jumped 18% after switching to story format', source: 'observed', when: 'today', ts: now, flagged: false },
+    { id: 'b3', text: 'Your ops role JD got 6 applicants in 4 hours — above average', source: 'observed', when: 'today', ts: now, flagged: false },
+    { id: 'b4', text: "You haven't looked at the sales pipeline in 5 days", source: 'observed', when: 'today', ts: now, flagged: false, mismatch: true },
+    { id: 'b5', text: 'Morning decisions stick — your afternoon reversals are 3× higher', source: 'observed', when: 'today', ts: now, flagged: false },
+    { id: 'b6', text: 'CRM cleanup freed 41 duplicates — your lead count is now accurate', source: 'observed', when: 'today', ts: now, flagged: false },
+    // yesterday
+    { id: 'y1', text: 'You approved the investor update without a single edit', source: 'observed', when: 'yesterday', ts: now - day, flagged: false },
+    { id: 'y2', text: 'Press list v2 matched 8 more journalists vs v1', source: 'observed', when: 'yesterday', ts: now - day, flagged: false },
+    { id: 'y3', text: 'You asked about annual pricing — might be exploring it', source: 'observed', when: 'yesterday', ts: now - day, flagged: false, mismatch: true },
+    { id: 'y4', text: 'Three back-to-back calls drained your decision bandwidth', source: 'observed', when: 'yesterday', ts: now - day, flagged: false },
+    { id: 'y5', text: 'Your hiring brief was the most detailed document this week', source: 'observed', when: 'yesterday', ts: now - day, flagged: false },
+    // last week
+    { id: 'w1', text: 'You shipped 14 items — 9 agent, 5 expert-reviewed', source: 'observed', when: 'last-week', ts: now - day * 5, flagged: false },
+    { id: 'w2', text: 'Average approval time dropped from 6h to 2h', source: 'observed', when: 'last-week', ts: now - day * 5, flagged: false },
+    { id: 'w3', text: 'You ignored 2 outbound sequences — deprioritising cold outreach?', source: 'observed', when: 'last-week', ts: now - day * 4, flagged: false, mismatch: true },
+    { id: 'w4', text: 'Hired your first ops contractor via the screening agent', source: 'observed', when: 'last-week', ts: now - day * 6, flagged: false },
+    { id: 'w5', text: 'Revenue conversations shifted from "how much" to "when to raise"', source: 'observed', when: 'last-week', ts: now - day * 3, flagged: false },
+    { id: 'w6', text: 'Your edge positioning resonated — 3 prospects quoted it back', source: 'observed', when: 'last-week', ts: now - day * 4, flagged: false },
+  ];
+  return facts;
+}
+
+function saveKnowledge(facts) {
+  try { localStorage.setItem(KNOWLEDGE_KEY, JSON.stringify(facts)); } catch {}
+}
+
+let knowledgeFacts = loadKnowledge() || seedKnowledge();
+saveKnowledge(knowledgeFacts);
+let kfFilter = 'today';
+let kfCalOpen = false;
+let kfCalDate = null;
+
+function factsForFilter() {
+  if (kfCalDate) {
+    const d = new Date(kfCalDate);
+    const start = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const end = start + 86400000;
+    return knowledgeFacts.filter(f => !f.removed && f.ts >= start && f.ts < end);
+  }
+  return knowledgeFacts.filter(f => !f.removed && f.when === kfFilter);
+}
+
+function renderKnowledgeFeed() {
+  const facts = factsForFilter();
+  if (!facts.length) return '<p class="kf-empty">Nothing logged for this period yet.</p>';
+  return facts.map(f => `
+    <div class="kf-row${f.mismatch ? ' kf-mismatch' : ''}${f.flagged ? ' kf-flagged' : ''}" data-kid="${f.id}">
+      <span class="kf-text">${escapeHtml(f.text)}</span>
+      <button class="kf-flag" aria-label="Flag this fact" data-kid="${f.id}">${FLAG_SVG}</button>
+    </div>
+    ${f.flagged ? `<div class="kf-correct" data-kid="${f.id}"><input class="kf-input" type="text" placeholder="What's correct?" data-kid="${f.id}" /><button class="kf-save" data-kid="${f.id}">Update</button></div>` : ''}
+  `).join('');
+}
 
 function renderCanvas() {
   const top = document.getElementById('canvasTop');
   const bottom = document.getElementById('canvasBottom');
   if (!top || !bottom) return;
-  const needs = WORK.filter(w => w.status === 'needs-you');
 
-  const greet = needs.length
-    ? `Morning. While you slept, things moved — one is waiting on your eyes.`
-    : `Morning. Everything that moved overnight is handled.`;
+  const greet = `Morning. Here's what I know about ${ONB.company || 'you'} — flag anything that's off.`;
 
-  let decision = '';
-  if (needs.length && !decisionDeferred) {
-    const w = needs[0];
-    decision = `
-    <div class="c-sec accent">
-      <div class="group-label">Needs you</div>
-      <div class="approval-card" data-open-sheet="${w.id}" tabindex="0" role="button">
-        <div class="who"><span class="avatar">${w.who}</span>
-          <span class="name">${w.whoName} <span class="role">· ${w.whoRole}</span></span></div>
-        <p class="say">${w.say}</p>
-        <div class="c-card-act">
-          <button class="cta" data-open-sheet="${w.id}">Review now</button>
-          <button class="c-later">Later today</button>
-        </div>
+  const tabs = ['today', 'yesterday', 'last-week'].map(t =>
+    `<button class="kf-tab${kfFilter === t && !kfCalDate ? ' active' : ''}" data-kf-tab="${t}">${t === 'last-week' ? 'Last week' : t.charAt(0).toUpperCase() + t.slice(1)}</button>`
+  ).join('');
+
+  const calBtn = `<button class="kf-tab kf-tab-cal${kfCalDate ? ' active' : ''}" data-kf-cal>${CAL_SVG}</button>`;
+  const calPicker = kfCalOpen ? `<div class="kf-cal-picker"><input type="date" class="kf-date-input" value="${kfCalDate || ''}" /></div>` : '';
+
+  const feedHtml = `
+    <div class="c-sec learnt">
+      <div class="kf-header">
+        <div class="group-label">What I know</div>
+        <div class="kf-tabs">${tabs}${calBtn}</div>
       </div>
+      ${calPicker}
+      <div class="kf-feed">${renderKnowledgeFeed()}</div>
     </div>`;
-  } else if (needs.length && decisionDeferred) {
-    decision = `<div class="c-sec accent"><div class="group-label">Needs you</div><p class="c-waiting">1 thing waiting for tonight · <button class="c-now">actually, show me now</button></p></div>`;
-  } else {
-    decision = `<div class="c-sec"><div class="group-label">Needs you</div><p class="c-handled">Nothing right now. Agents are working; experts are checking. That's the whole point.</p></div>`;
-  }
 
   const dayRows = DAY_PLAN.map(d => `
     <div class="day-row">
@@ -236,26 +301,66 @@ function renderCanvas() {
   top.innerHTML = `<p class="canvas-greet">${greet}</p>`;
   bottom.innerHTML = `
     <div class="c-row">
-      ${decision}
+      ${feedHtml}
       <div class="c-sec"><div class="group-label">Today</div>${dayRows}</div>
     </div>`;
-
-  bottom.querySelectorAll('.approval-card, .approval-card .cta').forEach(el =>
-    pressable(el, el.classList.contains('cta') ? 0.95 : 0.99));
 }
 
-/* canvas interactions: defer the decision, bring it back */
+/* knowledge feed interactions */
 document.addEventListener('click', (e) => {
-  if (e.target.closest('.c-later')) {
+  const tab = e.target.closest('.kf-tab:not(.kf-tab-cal)');
+  if (tab) {
     e.stopPropagation();
-    decisionDeferred = true;
+    kfFilter = tab.dataset.kfTab;
+    kfCalDate = null; kfCalOpen = false;
     renderCanvas();
     return;
   }
-  if (e.target.closest('.c-now')) {
-    decisionDeferred = false;
+  const calBtn = e.target.closest('.kf-tab-cal');
+  if (calBtn) {
+    e.stopPropagation();
+    kfCalOpen = !kfCalOpen;
     renderCanvas();
     return;
+  }
+  const flagBtn = e.target.closest('.kf-flag');
+  if (flagBtn) {
+    e.stopPropagation();
+    const id = flagBtn.dataset.kid;
+    const fact = knowledgeFacts.find(f => f.id === id);
+    if (fact) { fact.flagged = !fact.flagged; saveKnowledge(knowledgeFacts); renderCanvas(); }
+    return;
+  }
+  const saveBtn = e.target.closest('.kf-save');
+  if (saveBtn) {
+    e.stopPropagation();
+    const id = saveBtn.dataset.kid;
+    const input = document.querySelector(`.kf-input[data-kid="${id}"]`);
+    const val = input && input.value.trim();
+    if (val) {
+      const fact = knowledgeFacts.find(f => f.id === id);
+      if (fact) { fact.text = val; fact.flagged = false; fact.mismatch = false; fact.source = 'corrected'; saveKnowledge(knowledgeFacts); renderCanvas(); }
+    }
+    return;
+  }
+});
+
+document.addEventListener('change', (e) => {
+  if (e.target.classList.contains('kf-date-input')) {
+    kfCalDate = e.target.value || null;
+    kfCalOpen = false;
+    renderCanvas();
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.classList.contains('kf-input')) {
+    const id = e.target.dataset.kid;
+    const val = e.target.value.trim();
+    if (val) {
+      const fact = knowledgeFacts.find(f => f.id === id);
+      if (fact) { fact.text = val; fact.flagged = false; fact.mismatch = false; fact.source = 'corrected'; saveKnowledge(knowledgeFacts); renderCanvas(); }
+    }
   }
 });
 
@@ -486,7 +591,10 @@ suggest.querySelectorAll('.suggest-item').forEach(b => {
 
 /* opening beats — a tool opens already working */
 function seedChat() {
-  addMsg('allya', `Morning. While you slept, three things moved — two shipped, one's waiting on your eyes in the work panel. I never send anything without you.`);
+  const hello = (ONB && ONB.company)
+    ? `Morning. ${ONB.company} is set up and I'm already on it — while you slept, three things moved: two shipped, one's waiting on your eyes in the work panel. I never send anything without you.`
+    : `Morning. While you slept, three things moved — two shipped, one's waiting on your eyes in the work panel. I never send anything without you.`;
+  addMsg('allya', hello);
   showChips([
     { label: 'Review the newsletter', act: () => openSheet('newsletter') },
     { label: 'Where’s the ops hire?', act: () => sendText('Where’s the ops hire?') },
@@ -792,9 +900,9 @@ function unshipItem(id) {
   const todoCell = document.getElementById('islTodo');
   if (!kpiCell || !todoCell) return;
   const ROW = 40;                 // island height / row height
-  let kpiTrack, todoTrack, kpiItems = [], kpiIdx = 0, kpiTimer = 0;
-  let todoOffset = 0, todoLoopH = 0;
-  let raf = 0, last = 0;
+  let kpiTrack, todoTrack, kpiItems = [], kpiIdx = 0;
+  let todoLoopH = 0;
+  let kpiIv = 0;
   const kpiStep = new Spring(0, { response: 0.5, damping: 0.85, onframe: (y) => {
     if (kpiTrack) kpiTrack.style.transform = `translateY(${-y}px)`;
   }});
@@ -825,7 +933,7 @@ function unshipItem(id) {
   function build() {
     // KPI: a vertical track; wraps by appending a clone of the first item
     kpiItems = kpis();
-    kpiIdx = 0; kpiTimer = 0;
+    kpiIdx = 0;
     kpiCell.innerHTML = `<span class="isl-dot"></span><div class="kpi-track"></div>`;
     kpiTrack = kpiCell.querySelector('.kpi-track');
     const all = [...kpiItems, kpiItems[0]];
@@ -841,39 +949,30 @@ function unshipItem(id) {
     todoTrack = todoCell.querySelector('.todo-list');
     todoTrack.innerHTML = [...list, ...list].map(t =>
       `<div class="todo-item"><span class="td-dot ${t.needs ? 'needs' : ''}"></span>${escapeHtml(t.t)}</div>`).join('');
-    todoOffset = 0; todoTrack.style.transform = 'translateY(0px)';
-
-    if (reduceMotion) { todoTrack.style.transform = 'translateY(0px)'; }
+    // continuous scroll on the compositor (same 22px/s), no rAF
+    todoTrack.style.setProperty('--loop', `-${todoLoopH}px`);
+    todoTrack.style.animation = reduceMotion ? 'none' : `todo-scroll ${todoLoopH / 22}s linear infinite`;
   }
 
-  function refresh() { const wasRunning = !!raf; build(); if (wasRunning) { /* keep looping */ } }
+  function refresh() { build(); }
 
-  function tick(now) {
-    if (!raf) return;
-    let dt = (now - last) / 1000; last = now;
-    if (dt > 0.05) dt = 0.05;
-    const hidden = document.hidden || !todoCell.offsetParent;
-    if (!hidden && !reduceMotion) {
-      // KPI steps every ~3.2s
-      kpiTimer += dt;
-      if (kpiTimer > 3.2) {
-        kpiTimer = 0;
-        kpiIdx++;
-        kpiStep.to(kpiIdx * ROW);
-        if (kpiIdx >= kpiItems.length) {   // landed on the appended clone → snap home
-          setTimeout(() => { kpiIdx = 0; kpiStep.stop(); kpiStep.x = 0; if (kpiTrack) kpiTrack.style.transform = 'translateY(0px)'; }, 520);
-        }
-      }
-      // to-do scrolls up continuously
-      todoOffset += dt * 22;
-      if (todoOffset >= todoLoopH) todoOffset -= todoLoopH;
-      if (todoTrack) todoTrack.style.transform = `translateY(${-todoOffset}px)`;
+  function stepKpi() {
+    if (reduceMotion || document.hidden || !todoCell.offsetParent) return;
+    kpiIdx++;
+    kpiStep.to(kpiIdx * ROW);
+    if (kpiIdx >= kpiItems.length) {   // landed on the appended clone → snap home
+      setTimeout(() => { kpiIdx = 0; kpiStep.stop(); kpiStep.x = 0; if (kpiTrack) kpiTrack.style.transform = 'translateY(0px)'; }, 520);
     }
-    raf = requestAnimationFrame(tick);
   }
 
-  function start() { if (raf) return; last = performance.now(); raf = requestAnimationFrame(tick); }
-  function stop() { cancelAnimationFrame(raf); raf = 0; }
+  function start() {
+    if (!kpiIv) kpiIv = setInterval(stepKpi, 3200);
+    if (todoTrack) todoTrack.style.animationPlayState = 'running';
+  }
+  function stop() {
+    clearInterval(kpiIv); kpiIv = 0;
+    if (todoTrack) todoTrack.style.animationPlayState = 'paused';
+  }
 
   todoCell.addEventListener('click', () => {
     const top = WORK.find(w => w.status === 'needs-you');
@@ -895,12 +994,12 @@ function unshipItem(id) {
    the transition is continuous — the brain is never torn down.
    ============================================================ */
 const DEPT_COPY = {
-  marketing: { blurb: 'How the market hears about you. Campaigns, content, and the story you keep telling.' },
-  hiring:    { blurb: 'Who joins, in what order, and what you promise them on day one.' },
-  pr:        { blurb: 'Who writes about you, and why now. Relationships before pitches.' },
-  sales:     { blurb: 'Where revenue actually comes from this month — not the theory of it.' },
-  ops:       { blurb: 'The plumbing: money out, time spent, decisions written down.' },
-  core:      { blurb: 'Everything Allya knows about your company, in one place.' },
+  marketing: { blurb: 'How the market hears about you. Campaigns, content, and the story you keep telling.', metric: '3 channels live' },
+  hiring:    { blurb: 'Who joins, in what order, and what you promise them on day one.', metric: '1 role open' },
+  pr:        { blurb: 'Who writes about you, and why now. Relationships before pitches.', metric: '22 journalists mapped' },
+  sales:     { blurb: 'Where revenue actually comes from this month — not the theory of it.', metric: '7 leads warm' },
+  ops:       { blurb: 'The plumbing: money out, time spent, decisions written down.', metric: '4 systems tracked' },
+  core:      { blurb: 'Everything Allya knows about your company, in one place.', metric: 'live' },
 };
 
 (function dotPages() {
@@ -963,7 +1062,7 @@ const DEPT_COPY = {
       b.addEventListener('click', () => window.__brain && window.__brain.openNode(b.dataset.goto));
     });
     const back = document.getElementById('dotBack');
-    if (back) { back.addEventListener('click', () => close()); pressable(back, 0.97); }
+    if (back) { back.addEventListener('click', close); pressable(back, 0.97); }
     const ask = document.getElementById('dotAsk');
     if (ask) {
       pressable(ask, 0.98);
@@ -1050,7 +1149,7 @@ const DEPT_COPY = {
   };
   const DEF = {
     nodes: [
-      { id: 'co', label: 'Your company', tier: 0, group: 'core' },
+      { id: 'co', label: (ONB && ONB.company) ? ONB.company : 'Your company', tier: 0, group: 'core' },
       { id: 'marketing', label: 'Marketing', tier: 1, group: 'marketing', parent: 'co' },
       { id: 'hiring', label: 'Hiring', tier: 1, group: 'hiring', parent: 'co' },
       { id: 'pr', label: 'PR', tier: 1, group: 'pr', parent: 'co' },
@@ -1136,7 +1235,7 @@ const DEPT_COPY = {
   function resize() {
     const w = box.clientWidth, h = box.clientHeight;
     if (!w || !h) return false;
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    dpr = Math.min(window.devicePixelRatio || 1, 1.25);   // capped — 2x quadruples pixel work
     W = w; H = h;
     S = clamp(Math.min(W, H) / 300, 0.82, 1.5);   // scale everything to the box
     canvas.width = W * dpr; canvas.height = H * dpr;
@@ -1339,15 +1438,20 @@ const DEPT_COPY = {
     ctx.save();
     ctx.translate(W / 2, H / 2); ctx.scale(cam.z, cam.z); ctx.translate(-cam.x, -cam.y);
 
-    // ---- edges: gradient strands, brighter where a node is lit ----
+    // ---- edges: gradient strands only while lit; resting edges use a
+    // flat faint stroke (gradient objects per frame are expensive) ----
     for (const [aid, bid] of edges) {
       const a = nodeById[aid], b = nodeById[bid];
       ctx.globalAlpha = Math.max(fogOf(a), fogOf(b));
       const lit = Math.max(a.ex, b.ex);
-      const g = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
-      g.addColorStop(0, hexA(GROUPS[a.group] || '#91d45f', 0.05 + a.ex * 0.3 + lit * 0.08));
-      g.addColorStop(1, hexA(GROUPS[b.group] || '#91d45f', 0.05 + b.ex * 0.3 + lit * 0.08));
-      ctx.strokeStyle = g;
+      if (lit > 0.03) {
+        const g = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+        g.addColorStop(0, hexA(GROUPS[a.group] || '#91d45f', 0.05 + a.ex * 0.3 + lit * 0.08));
+        g.addColorStop(1, hexA(GROUPS[b.group] || '#91d45f', 0.05 + b.ex * 0.3 + lit * 0.08));
+        ctx.strokeStyle = g;
+      } else {
+        ctx.strokeStyle = hexA(GROUPS[a.group] || '#91d45f', 0.05);
+      }
       ctx.lineWidth = (0.8 + lit * 1.2) * S / cam.z;
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
     }
@@ -1389,19 +1493,27 @@ const DEPT_COPY = {
       const r = nodeR(n) * (hub ? 1 + 0.05 * Math.sin(time * 1.6) : 1);
       const glow = (hub ? 1 : 0) + n.ex + breath;
 
-      // halo
-      const haloR = r + (hub ? 26 : 11) * S + n.ex * 12 * S + breath * 8 * S;
-      const hg = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, haloR);
-      hg.addColorStop(0, hexA(liveWork ? '#91d45f' : col, 0.05 + glow * 0.16));
-      hg.addColorStop(1, hexA(col, 0));
-      ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(n.x, n.y, haloR, 0, TAU); ctx.fill();
+      // halo — only where it's visible (hub, excited, or breathing);
+      // resting halos sit at ~5% alpha and aren't worth a gradient each
+      if (hub || glow > 0.03) {
+        const haloR = r + (hub ? 26 : 11) * S + n.ex * 12 * S + breath * 8 * S;
+        const hg = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, haloR);
+        hg.addColorStop(0, hexA(liveWork ? '#91d45f' : col, 0.05 + glow * 0.16));
+        hg.addColorStop(1, hexA(col, 0));
+        ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(n.x, n.y, haloR, 0, TAU); ctx.fill();
+      }
 
-      // core (lighter centre for a lit look)
+      // core (lighter centre for a lit look; flat fill for resting leaves)
       const base = hub ? 0.98 : n.tier === 1 ? 0.72 : 0.46;
-      const cg = ctx.createRadialGradient(n.x - r * 0.3, n.y - r * 0.3, 0, n.x, n.y, r);
-      cg.addColorStop(0, hexA(lighten(col), clamp(base + n.ex * 0.5, 0, 1)));
-      cg.addColorStop(1, hexA(col, clamp(base + n.ex * 0.4, 0, 1)));
-      ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, TAU); ctx.fill();
+      if (n.tier === 2 && n.ex < 0.02) {
+        ctx.fillStyle = hexA(col, base);
+      } else {
+        const cg = ctx.createRadialGradient(n.x - r * 0.3, n.y - r * 0.3, 0, n.x, n.y, r);
+        cg.addColorStop(0, hexA(lighten(col), clamp(base + n.ex * 0.5, 0, 1)));
+        cg.addColorStop(1, hexA(col, clamp(base + n.ex * 0.4, 0, 1)));
+        ctx.fillStyle = cg;
+      }
+      ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, TAU); ctx.fill();
       if (hub) { ctx.lineWidth = 1.5 * S / cam.z; ctx.strokeStyle = hexA('#eafbdc', 0.6); ctx.stroke(); }
 
       // the focused node keeps a bright ring around it while its page is up
@@ -1459,31 +1571,43 @@ const DEPT_COPY = {
     return `rgba(${r},${g},${b},${clamp(a, 0, 1)})`;
   }
 
-  let raf = 0, last = 0;
+  let raf = 0, last = 0, boxHidden = false, probeAt = 0;
   function frame(now) {
     if (!raf) return;
+    raf = requestAnimationFrame(frame);
+    // layout probes (offsetParent / clientWidth) force reflow — twice a second is plenty
+    if (now >= probeAt) {
+      probeAt = now + 500;
+      boxHidden = !box.offsetParent;   // hidden (chatting)
+      if (!boxHidden && (W !== box.clientWidth || H !== box.clientHeight)) resize();
+    }
+    if (boxHidden) { last = now; return; }
+    // 30fps while something is happening, ~15fps for the idle drift
+    const camMoving = Math.abs(cam.z - cam.zT) > 0.002 || Math.abs(cam.fog - cam.fogT) > 0.002 ||
+      Math.abs(cam.x - cam.xT) > 0.4 || Math.abs(cam.y - cam.yT) > 0.4;
+    const active = dragNode || hoverNode || camMoving || pulses.length || ripples.length || nodes.some(n => n.ex > 0.02);
+    if (now - last < (active ? 33 : 66)) return;
     let dt = (now - last) / 1000; last = now;
-    if (dt > 0.05) dt = 0.05;
-    if (!box.offsetParent) { raf = requestAnimationFrame(frame); return; }   // hidden (chatting)
-    if (W !== box.clientWidth || H !== box.clientHeight) resize();
+    if (dt > 0.08) dt = 0.08;
     if (!reduceMotion) {
-      step(dt);
+      // substep so the springs stay stable at the lower frame rate
+      const sub = dt > 0.04 ? 2 : 1;
+      for (let i = 0; i < sub; i++) step(dt / sub);
       // advance thoughts
       thoughtClock += dt;
-      if (thoughtClock > 2.6) { thoughtClock = 0; fireThought(); }
+      if (thoughtClock > 5) { thoughtClock = 0; fireThought(); }
       for (const s of pulses) { if (s.delay > 0) { s.delay -= dt; } else { s.t += dt / s.dur; if (s.t >= 0.5 && !s._hit) { s._hit = true; excite(s.b, 0.6); } } }
       pulses = pulses.filter(s => s.t < 1);
       for (const rp of ripples) rp.t += dt / 0.7;
       ripples = ripples.filter(rp => rp.t < 1);
     }
     draw();
-    raf = requestAnimationFrame(frame);
   }
   function start() {
     if (raf) return;
     if (!resize()) { requestAnimationFrame(start); return; }
     if (reduceMotion) { draw(); return; }   // static graph, no loop
-    last = performance.now(); raf = requestAnimationFrame(frame);
+    last = performance.now(); probeAt = 0; raf = requestAnimationFrame(frame);
   }
   function stop() { cancelAnimationFrame(raf); raf = 0; }
 

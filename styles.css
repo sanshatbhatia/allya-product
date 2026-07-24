@@ -82,9 +82,7 @@ button { font-family: inherit; color: inherit; }
   height: 46px;
   display: flex; align-items: center; gap: 10px;
   padding: 0 16px;
-  background: rgba(10, 10, 10, 0.72);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  background: rgba(12, 12, 12, 0.94);
   border-bottom: 1px solid var(--hairline);
   z-index: 20;
 }
@@ -137,9 +135,7 @@ button { font-family: inherit; color: inherit; }
   display: flex; align-items: stretch;
   width: 100%; max-width: 440px;
   height: 40px;
-  background: rgba(23, 23, 23, 0.66);
-  backdrop-filter: blur(18px) saturate(160%);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  background: rgba(23, 23, 23, 0.92);
   border: 1px solid var(--hairline-strong);
   border-radius: 999px;
   overflow: hidden;
@@ -180,6 +176,8 @@ button { font-family: inherit; color: inherit; }
   position: relative; flex: 1; height: 100%; overflow: hidden;
 }
 .isl-todo .todo-list { position: absolute; left: 0; top: 0; will-change: transform; }
+/* continuous scroll runs on the compositor — no per-frame JS */
+@keyframes todo-scroll { to { transform: translateY(var(--loop, 0px)); } }
 .isl-todo .todo-item {
   height: 40px; display: flex; align-items: center; gap: 7px;
   font-size: 12px; color: var(--fg-soft); white-space: nowrap;
@@ -302,6 +300,109 @@ button { font-family: inherit; color: inherit; }
 }
 .c-waiting button:hover { text-decoration: underline; }
 
+/* knowledge feed */
+.c-sec.learnt {
+  background: rgba(145, 212, 95, 0.02);
+  border-color: rgba(145, 212, 95, 0.14);
+  display: flex; flex-direction: column;
+}
+.kf-header {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 8px 10px;
+  margin-bottom: 10px;
+}
+/* the label never wraps to "WHAT / I / KNOW"; if the tabs don't fit beside
+   it they drop to their own full-width line instead of pushing the
+   calendar button out of the card */
+.kf-header .group-label { margin: 0; white-space: nowrap; flex: none; }
+.kf-tabs {
+  display: flex; gap: 4px; align-items: center; flex-wrap: wrap;
+}
+.kf-tab {
+  appearance: none; background: rgba(255,255,255,0.04);
+  border: 1px solid var(--hairline); border-radius: 6px;
+  padding: 4px 10px; font-size: 11.5px; font-weight: 500;
+  color: var(--fg-faint); cursor: pointer; transition: all 0.15s;
+}
+.kf-tab:hover { color: var(--fg-soft); border-color: rgba(255,255,255,0.12); }
+.kf-tab.active {
+  color: var(--lime); border-color: rgba(145, 212, 95, 0.4);
+  background: rgba(145, 212, 95, 0.08);
+}
+.kf-tab-cal { padding: 4px 7px; display: flex; align-items: center; }
+.kf-cal-icon { width: 14px; height: 14px; display: block; }
+.kf-cal-picker {
+  margin-bottom: 10px;
+}
+.kf-date-input {
+  font-size: 12.5px; color: var(--fg); background: rgba(255,255,255,0.04);
+  border: 1px solid var(--hairline); border-radius: 6px;
+  padding: 5px 10px; outline: none; width: 100%;
+  color-scheme: dark;
+}
+.kf-date-input:focus { border-color: rgba(145, 212, 95, 0.4); }
+.kf-feed {
+  display: flex; flex-direction: column; gap: 2px;
+  max-height: 164px; overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(145, 212, 95, 0.2) transparent;
+}
+.kf-feed::-webkit-scrollbar { width: 4px; }
+.kf-feed::-webkit-scrollbar-track { background: transparent; }
+.kf-feed::-webkit-scrollbar-thumb { background: rgba(145, 212, 95, 0.2); border-radius: 4px; }
+.kf-feed::-webkit-scrollbar-thumb:hover { background: rgba(145, 212, 95, 0.35); }
+.kf-empty {
+  font-size: 13px; color: var(--fg-faint); margin: 0; padding: 8px 0;
+  font-style: italic;
+}
+.kf-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; border-radius: 8px;
+  transition: background 0.15s; flex-shrink: 0;
+}
+.kf-row:hover { background: rgba(255,255,255,0.03); }
+.kf-text {
+  flex: 1; font-size: 13.5px; color: var(--fg-soft); line-height: 1.4;
+}
+.kf-flag {
+  appearance: none; background: none; border: none; cursor: pointer;
+  padding: 4px; border-radius: 6px; opacity: 0; transition: opacity 0.15s;
+  color: var(--fg-faint); flex-shrink: 0;
+}
+.kf-row:hover .kf-flag { opacity: 1; }
+.kf-flag:hover { color: #e7c98a; }
+.kf-flag-icon { width: 14px; height: 14px; display: block; }
+
+/* mismatch — Allya flagged it */
+.kf-row.kf-mismatch {
+  background: rgba(231, 201, 138, 0.06);
+  border-left: 2px solid rgba(231, 201, 138, 0.5);
+  padding-left: 10px;
+}
+.kf-row.kf-mismatch .kf-flag { opacity: 1; color: #e7c98a; }
+
+/* user flagged */
+.kf-row.kf-flagged { opacity: 0.6; }
+.kf-row.kf-flagged .kf-flag { opacity: 1; color: #e7c98a; }
+
+/* correction input */
+.kf-correct {
+  display: flex; gap: 6px; padding: 2px 8px 6px 28px; flex-shrink: 0;
+}
+.kf-input {
+  flex: 1; font-size: 12.5px; color: var(--fg);
+  background: rgba(255,255,255,0.04); border: 1px solid var(--hairline);
+  border-radius: 6px; padding: 5px 10px; outline: none;
+}
+.kf-input:focus { border-color: rgba(145, 212, 95, 0.4); }
+.kf-save {
+  appearance: none; font-size: 11.5px; font-weight: 600;
+  color: var(--lime); background: rgba(145, 212, 95, 0.1);
+  border: 1px solid rgba(145, 212, 95, 0.3); border-radius: 6px;
+  padding: 4px 10px; cursor: pointer;
+}
+.kf-save:hover { background: rgba(145, 212, 95, 0.18); }
+
 /* day strip */
 .day-row {
   display: flex; align-items: center; gap: 12px;
@@ -387,9 +488,7 @@ button { font-family: inherit; color: inherit; }
   position: relative;
   padding: 10px 24px 16px;
   border-top: 1px solid var(--hairline);
-  background: rgba(10,10,10,0.72);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(12,12,12,0.94);
 }
 
 /* pops up from the field when it gains focus (anchored to its source) */
@@ -679,9 +778,7 @@ button { font-family: inherit; color: inherit; }
 .sheet-foot {
   flex: none; padding: 13px 22px calc(15px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--hairline);
-  background: rgba(10,10,10,0.6);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: rgba(12,12,12,0.94);
   display: flex; align-items: center; gap: 10px;
 }
 .sheet-foot .cta { flex: 1; }

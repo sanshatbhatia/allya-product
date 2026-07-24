@@ -397,6 +397,11 @@
 .ob-mcq-grid {
   flex: 1; min-height: 0;
   display: grid; grid-template-columns: 1fr 1.06fr;
+  /* explicit single row bounded to the grid height — without it the row is
+     auto-sized to the (tall) question list on some browsers, which pushes the
+     confirm button below the fold. This pins each column to the viewport so
+     the list scrolls inside and the confirm foot stays put. */
+  grid-template-rows: minmax(0, 1fr);
   width: 100%; max-width: 1200px; margin: 0 auto;
 }
 /* left — the questions. Flex column: identity header, scrolling list,
