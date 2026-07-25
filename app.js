@@ -901,10 +901,12 @@ function unshipItem(id) {
   if (!kpiCell || !todoCell) return;
   const ROW = 40;                 // island height / row height
   let kpiTrack, todoTrack, kpiItems = [], kpiIdx = 0;
-  let todoLoopH = 0;
+  let todoLoopW = 0;              // the to-do ticker runs sideways now
   let kpiIv = 0;
-  const kpiStep = new Spring(0, { response: 0.5, damping: 0.85, onframe: (y) => {
-    if (kpiTrack) kpiTrack.style.transform = `translateY(${-y}px)`;
+  let cellW = 0;                  // KPI cell width — the step distance
+  // KPIs slide in from the right, one at a time (was a vertical roll)
+  const kpiStep = new Spring(0, { response: 0.5, damping: 0.85, onframe: (x) => {
+    if (kpiTrack) kpiTrack.style.transform = `translateX(${-x}px)`;
   }});
 
   function kpis() {
@@ -931,37 +933,56 @@ function unshipItem(id) {
   }
 
   function build() {
-    // KPI: a vertical track; wraps by appending a clone of the first item
+    // KPI: a horizontal track; wraps by appending a clone of the first item
     kpiItems = kpis();
     kpiIdx = 0;
     kpiCell.innerHTML = `<span class="isl-dot"></span><div class="kpi-track"></div>`;
     kpiTrack = kpiCell.querySelector('.kpi-track');
     const all = [...kpiItems, kpiItems[0]];
     kpiTrack.innerHTML = all.map((k, i) =>
-      `<div class="kpi-item" style="transform:translateY(${i * ROW}px)"><span><b>${k.n}</b> ${k.l}</span></div>`).join('');
-    kpiStep.stop(); kpiStep.x = 0; kpiTrack.style.transform = 'translateY(0px)';
+      `<div class="kpi-item" style="transform:translateX(${i * 100}%)"><span><b>${k.n}</b> ${k.l}</span></div>`).join('');
+    kpiStep.stop(); kpiStep.x = 0; kpiTrack.style.transform = 'translateX(0px)';
+    measure();
 
-    // to-do: duplicate the list so the upward scroll is seamless
+    // to-do: duplicate the list so the sideways scroll is seamless
     const list = todos();
-    todoLoopH = list.length * ROW;
     todoCell.innerHTML =
       `<span class="todo-tag">to-do</span><div class="todo-track"><div class="todo-list"></div></div>`;
     todoTrack = todoCell.querySelector('.todo-list');
     todoTrack.innerHTML = [...list, ...list].map(t =>
       `<div class="todo-item"><span class="td-dot ${t.needs ? 'needs' : ''}"></span>${escapeHtml(t.t)}</div>`).join('');
-    // continuous scroll on the compositor (same 22px/s), no rAF
-    todoTrack.style.setProperty('--loop', `-${todoLoopH}px`);
-    todoTrack.style.animation = reduceMotion ? 'none' : `todo-scroll ${todoLoopH / 22}s linear infinite`;
+    // one copy's width is the loop distance. Measured synchronously — a
+    // rAF here silently never fires in a backgrounded tab and the ticker
+    // would never start. scrollWidth forces layout, which is what we want.
+    setTodoLoop();
   }
+
+  function setTodoLoop() {
+    if (!todoTrack) return;
+    const w = todoTrack.scrollWidth / 2;
+    if (!w) return;
+    todoLoopW = w;
+    todoTrack.style.setProperty('--loop', `-${w}px`);
+    todoTrack.style.animation = reduceMotion ? 'none' : `todo-scroll ${w / 34}s linear infinite`;
+  }
+
+  // the KPI cell's width is the step distance; re-read on resize
+  function measure() {
+    if (!kpiTrack) return;
+    cellW = kpiTrack.clientWidth || 0;
+    if (!kpiStep.running) kpiTrack.style.transform = `translateX(${-kpiIdx * cellW}px)`;
+  }
+  window.addEventListener('resize', () => { measure(); setTodoLoop(); });
 
   function refresh() { build(); }
 
   function stepKpi() {
     if (reduceMotion || document.hidden || !todoCell.offsetParent) return;
+    if (!cellW) measure();
     kpiIdx++;
-    kpiStep.to(kpiIdx * ROW);
+    kpiStep.to(kpiIdx * cellW);
     if (kpiIdx >= kpiItems.length) {   // landed on the appended clone → snap home
-      setTimeout(() => { kpiIdx = 0; kpiStep.stop(); kpiStep.x = 0; if (kpiTrack) kpiTrack.style.transform = 'translateY(0px)'; }, 520);
+      setTimeout(() => { kpiIdx = 0; kpiStep.stop(); kpiStep.x = 0; if (kpiTrack) kpiTrack.style.transform = 'translateX(0px)'; }, 520);
     }
   }
 
@@ -974,16 +995,95 @@ function unshipItem(id) {
     if (todoTrack) todoTrack.style.animationPlayState = 'paused';
   }
 
-  todoCell.addEventListener('click', () => {
-    const top = WORK.find(w => w.status === 'needs-you');
-    if (top) openSheet(top.id);
-    else input.focus();
-  });
+  /* ---- expansion: the pill grows into a panel, the way iOS's Dynamic
+     Island does — same element, springing open, contents cross-fading in.
+     Both halves keep their own scroll so the full list is reachable. ---- */
+  const island = document.getElementById('island');
+  const detail = document.getElementById('islandDetail');
+  let open = false;
+
+  function renderDetail() {
+    if (!detail) return;
+    const needs = WORK.filter(w => w.status === 'needs-you');
+    const running = WORK.filter(w => w.status === 'running');
+    const shipped = WORK.filter(w => w.status === 'shipped');
+    const row = (w, tag) => `
+      <button class="idet-row" data-work-id="${w.id}">
+        <span class="td-dot ${w.status === 'needs-you' ? 'needs' : ''}"></span>
+        <span class="idet-copy">
+          <span class="idet-t">${escapeHtml(w.title || w.say || '')}</span>
+          ${w.meta ? `<span class="idet-m">${escapeHtml(w.meta)}</span>` : ''}
+        </span>
+        <span class="pill ${w.origin === 'expert' ? 'expert' : ''}">${tag}</span>
+      </button>`;
+
+    const todoHtml = [
+      needs.length ? `<div class="idet-group">Needs you</div>${needs.map(w => row(w, 'you')).join('')}` : '',
+      running.length ? `<div class="idet-group">Running</div>${running.map(w => row(w, w.origin || 'agent')).join('')}` : '',
+      shipped.length ? `<div class="idet-group">Shipped today</div>${shipped.map(w => row(w, w.origin || 'agent')).join('')}` : '',
+    ].join('') || `<div class="idet-empty">All clear — nothing waiting.</div>`;
+
+    const kpiHtml = kpis().map(k => `
+      <div class="idet-kpi"><b>${k.n}</b><span>${escapeHtml(k.l)}</span></div>`).join('')
+      + `<div class="idet-group">This week</div>
+         <div class="idet-note">${shipped.length + 12} shipped · ${running.length} in flight · ${needs.length} waiting on you.</div>
+         <div class="idet-note">Nothing leaves the building without your approval.</div>`;
+
+    detail.innerHTML = `
+      <div class="idet-pane idet-left">${kpiHtml}</div>
+      <div class="idet-pane idet-right">${todoHtml}</div>`;
+
+    detail.querySelectorAll('[data-work-id]').forEach(b => {
+      b.addEventListener('click', () => { setOpen(false); openSheet(b.dataset.workId); });
+    });
+  }
+
+  function setOpen(on) {
+    if (on === open || !island) return;
+    open = on;
+    if (on) renderDetail();
+    island.classList.toggle('is-open', on);
+    island.setAttribute('aria-expanded', String(on));
+    if (on) stop(); else start();      // tickers pause while it's open
+  }
+
+  todoCell.addEventListener('click', (e) => { e.stopPropagation(); setOpen(!open); });
+  kpiCell.addEventListener('click', (e) => { e.stopPropagation(); setOpen(!open); });
+  document.addEventListener('click', (e) => { if (open && island && !island.contains(e.target)) setOpen(false); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && open) { e.stopPropagation(); setOpen(false); } }, true);
+
   document.addEventListener('visibilitychange', () => (document.hidden ? stop() : start()));
 
   build();
   start();
-  window.__island = { refresh, start, stop };
+  window.__island = { refresh, start, stop, setOpen, get isOpen() { return open; } };
+})();
+
+/* ============================================================
+   Page switcher — the caret next to the date. Click-outside and
+   Escape close it; the current page is marked so you always know
+   where you are.
+   ============================================================ */
+(function pagePicker() {
+  const btn = document.getElementById('pagePickBtn');
+  const menu = document.getElementById('pagePickMenu');
+  if (!btn || !menu) return;
+
+  // mark the page you're actually on, whatever it's called on disk
+  const here = location.pathname.replace(/\/$/, '').split('/').pop() || 'index.html';
+  menu.querySelectorAll('a').forEach(a => {
+    const target = a.getAttribute('href').replace('.html', '');
+    a.classList.toggle('is-here', here.replace('.html', '') === target || (here === '' && target === 'index'));
+  });
+
+  const open = (on) => {
+    menu.hidden = !on;
+    btn.setAttribute('aria-expanded', String(on));
+  };
+  btn.addEventListener('click', (e) => { e.stopPropagation(); open(menu.hidden); });
+  document.addEventListener('click', (e) => { if (!menu.hidden && !menu.contains(e.target)) open(false); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !menu.hidden) { e.stopPropagation(); open(false); btn.focus(); } }, true);
+  pressable(btn, 0.9);
 })();
 
 /* ============================================================

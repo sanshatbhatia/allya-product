@@ -94,6 +94,46 @@ button { font-family: inherit; color: inherit; }
 }
 .topbar .date { color: var(--fg-faint); font-weight: 400; font-size: 13px; }
 .topbar .spacer { flex: 1; }
+
+/* ---- page switcher, tucked next to the date ---- */
+.pagepick { position: relative; display: flex; }
+.pagepick-btn {
+  appearance: none; cursor: pointer;
+  display: grid; place-items: center;
+  width: 20px; height: 20px; border-radius: 6px;
+  background: none; border: 1px solid transparent; color: var(--fg-faint);
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.pagepick-btn svg { width: 13px; height: 13px; transition: transform var(--dur) var(--ease); }
+.pagepick-btn:hover { color: var(--fg-soft); background: var(--raised); border-color: var(--hairline); }
+.pagepick-btn[aria-expanded="true"] { color: var(--fg); background: var(--raised); border-color: var(--hairline-strong); }
+.pagepick-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
+
+.pagepick-menu {
+  position: absolute; top: calc(100% + 8px); left: -8px; z-index: 40;
+  min-width: 232px;
+  background: var(--card); border: 1px solid var(--hairline-strong);
+  border-radius: 12px; padding: 5px;
+  box-shadow: 0 16px 44px -14px rgba(0,0,0,0.9);
+  display: grid; gap: 2px;
+  transform-origin: top left;
+  animation: pagepick-in 180ms var(--ease) both;
+}
+.pagepick-menu[hidden] { display: none; }
+@keyframes pagepick-in { from { opacity: 0; transform: translateY(-4px) scale(0.97); } to { opacity: 1; transform: none; } }
+.pagepick-menu a {
+  display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 9px;
+  padding: 8px 10px; border-radius: 8px;
+  font-size: 13px; color: var(--fg); text-decoration: none;
+}
+.pagepick-menu a:hover { background: var(--raised); }
+.pagepick-menu .pp-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--fg-faint);
+}
+.pagepick-menu .is-here .pp-dot { background: var(--lime); box-shadow: 0 0 7px rgba(145,212,95,0.6); }
+.pagepick-menu .pp-note {
+  grid-column: 2; font-size: 11.5px; color: var(--fg-faint); margin-top: -1px;
+}
 .status-line { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--fg-soft); }
 .status-line .pulse {
   width: 6px; height: 6px; border-radius: 50%; background: var(--lime);
@@ -131,27 +171,98 @@ button { font-family: inherit; color: inherit; }
   display: flex; justify-content: center;
   padding: 10px 24px 2px;
 }
+/* the pill itself. Expanding is a spring on max-width/height/radius of the
+   SAME element — the way iOS's Dynamic Island grows — not a separate popup */
 .island {
-  display: flex; align-items: stretch;
+  display: flex; flex-direction: column;
   width: 100%; max-width: 440px;
-  height: 40px;
   background: rgba(23, 23, 23, 0.92);
   border: 1px solid var(--hairline-strong);
   border-radius: 999px;
   overflow: hidden;
   box-shadow: 0 8px 30px -12px rgba(0, 0, 0, 0.9);
+  transition:
+    max-width 460ms var(--spring, cubic-bezier(0.2, 0.9, 0.25, 1)),
+    border-radius 300ms var(--ease),
+    box-shadow 300ms var(--ease);
 }
+.isl-row { display: flex; align-items: stretch; height: 40px; flex: none; }
 .isl-cell {
   display: flex; align-items: center;
   min-width: 0; overflow: hidden;
   padding: 0 15px;
+  cursor: pointer;
+}
+
+/* ---- expanded ---- */
+.island.is-open {
+  max-width: 560px;
+  border-radius: 22px;
+  box-shadow: 0 26px 70px -18px rgba(0, 0, 0, 0.95);
+}
+.island-detail {
+  display: grid; grid-template-columns: 0.85fr 1.15fr;
+  max-height: 0; opacity: 0;
+  transition: max-height 460ms var(--spring, cubic-bezier(0.2, 0.9, 0.25, 1)),
+              opacity 220ms var(--ease);
+}
+.island.is-open .island-detail {
+  max-height: 340px; opacity: 1;
+  border-top: 1px solid var(--hairline);
+}
+/* each half scrolls on its own, so the full list is reachable */
+.idet-pane {
+  min-width: 0; max-height: 340px; overflow-y: auto;
+  padding: 12px 14px 14px;
+  scrollbar-width: thin; scrollbar-color: var(--hairline-strong) transparent;
+}
+.idet-pane::-webkit-scrollbar { width: 8px; }
+.idet-pane::-webkit-scrollbar-thumb { background: var(--hairline-strong); border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+.idet-left { border-right: 1px solid var(--hairline); }
+
+.idet-group {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--fg-faint); margin: 12px 0 7px;
+}
+.idet-pane > .idet-group:first-child, .idet-pane > .idet-kpi:first-child { margin-top: 0; }
+.idet-kpi { display: flex; align-items: baseline; gap: 7px; padding: 5px 0; font-size: 12.5px; color: var(--fg-soft); }
+.idet-kpi b { font-size: 16px; font-weight: 600; color: var(--lime-glow); font-variant-numeric: tabular-nums; }
+.idet-note { font-size: 11.5px; line-height: 1.5; color: var(--fg-faint); margin-bottom: 7px; }
+
+.idet-row {
+  width: 100%; appearance: none; cursor: pointer; text-align: left;
+  display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: 9px;
+  background: none; border: none; border-radius: 9px;
+  padding: 8px 9px;
+}
+.idet-row:hover { background: rgba(255,255,255,0.04); }
+.idet-row .td-dot { margin-top: 5px; }
+.idet-copy { min-width: 0; display: grid; gap: 2px; }
+.idet-t { font-size: 12.5px; line-height: 1.35; color: var(--fg); }
+.idet-m { font-size: 11px; color: var(--fg-faint); }
+.idet-row .pill { align-self: start; font-size: 10px; padding: 2px 7px; }
+.idet-empty { font-size: 12.5px; color: var(--fg-faint); padding: 6px 0; }
+
+/* narrow: two 145px columns squeeze the copy, so stack them and give each
+   half its own shorter scroll instead */
+@media (max-width: 640px) {
+  .island-detail { grid-template-columns: 1fr; }
+  .island.is-open .island-detail { max-height: 360px; }
+  .idet-pane { max-height: 180px; }
+  .idet-left { border-right: none; border-bottom: 1px solid var(--hairline); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .island, .island-detail { transition: none; }
 }
 .isl-kpi { flex: 0 0 43%; gap: 8px; border-right: 1px solid var(--hairline); }
 .isl-kpi .isl-dot {
   flex: none; width: 6px; height: 6px; border-radius: 50%;
   background: var(--lime); box-shadow: 0 0 7px rgba(145,212,95,0.6);
 }
-.isl-kpi .kpi-track { position: relative; flex: 1; height: 100%; }
+.isl-kpi .kpi-track { position: relative; flex: 1; height: 100%; overflow: hidden; }
+/* items sit side by side and the track slides left — the roll runs
+   horizontally now, matching the to-do ticker beside it */
 .isl-kpi .kpi-item {
   position: absolute; inset: 0;
   display: flex; align-items: center;
@@ -175,11 +286,17 @@ button { font-family: inherit; color: inherit; }
 .isl-todo .todo-track {
   position: relative; flex: 1; height: 100%; overflow: hidden;
 }
-.isl-todo .todo-list { position: absolute; left: 0; top: 0; will-change: transform; }
-/* continuous scroll runs on the compositor — no per-frame JS */
-@keyframes todo-scroll { to { transform: translateY(var(--loop, 0px)); } }
+.isl-todo .todo-list {
+  position: absolute; left: 0; top: 0; height: 100%;
+  display: flex; align-items: center; gap: 22px;
+  will-change: transform;
+}
+/* continuous scroll runs on the compositor — no per-frame JS.
+   Right-to-left travel, so the text reads as it passes. */
+@keyframes todo-scroll { to { transform: translateX(var(--loop, 0px)); } }
 .isl-todo .todo-item {
-  height: 40px; display: flex; align-items: center; gap: 7px;
+  flex: none;
+  display: flex; align-items: center; gap: 7px;
   font-size: 12px; color: var(--fg-soft); white-space: nowrap;
 }
 .isl-todo .todo-item .td-dot { flex: none; width: 5px; height: 5px; border-radius: 50%; background: var(--fg-faint); }

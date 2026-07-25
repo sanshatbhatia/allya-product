@@ -14,7 +14,18 @@
   <div id="app">
 
     <header class="topbar">
-      <div class="brand"><span class="lamp"></span> Allya <span class="date">· Tuesday</span></div>
+      <div class="brand">
+        <span class="lamp"></span> Allya <span class="date">· Tuesday</span>
+        <div class="pagepick">
+          <button class="pagepick-btn" id="pagePickBtn" aria-haspopup="menu" aria-expanded="false" aria-label="Go to another page">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="pagepick-menu" id="pagePickMenu" role="menu" hidden>
+            <a role="menuitem" href="index.html" class="is-here"><span class="pp-dot"></span>Workspace<span class="pp-note">where the work lives</span></a>
+            <a role="menuitem" href="onboarding.html"><span class="pp-dot"></span>Onboarding<span class="pp-note">build your company brain</span></a>
+          </div>
+        </div>
+      </div>
       <nav class="tabs" aria-label="Panes">
         <button class="tab active" data-tab="chat">Talk</button>
         <button class="tab" data-tab="work">Work <span class="badge" id="tabBadge">·1</span></button>
@@ -31,9 +42,13 @@
       <section class="pane-chat" id="paneChat" aria-label="Conversation with Allya">
         <!-- dynamic island: KPIs | running to-do ticker -->
         <div class="island-wrap">
-          <div class="island" id="island" aria-label="Live status">
-            <div class="isl-cell isl-kpi" id="islKpi"></div>
-            <button class="isl-cell isl-todo" id="islTodo" aria-label="Open what needs you"></button>
+          <div class="island" id="island" aria-label="Live status" aria-expanded="false">
+            <div class="isl-row">
+              <div class="isl-cell isl-kpi" id="islKpi"></div>
+              <button class="isl-cell isl-todo" id="islTodo" aria-label="Expand live status"></button>
+            </div>
+            <!-- grows out of the pill when expanded; both panes scroll -->
+            <div class="island-detail" id="islandDetail"></div>
           </div>
         </div>
         <div class="canvas" id="canvas">
