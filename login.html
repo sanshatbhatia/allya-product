@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Allya — log in</title>
+  <meta name="description" content="Sign in to ZeroTo10 — Allya picks up where you left off: the work in flight, the decisions waiting on you, the whole company map." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,380..520&family=Inter+Tight:wght@400;450;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="login.css" />
+</head>
+<body class="login-body">
+
+  <!-- the brain, thinking behind everything -->
+  <canvas id="brain" aria-hidden="true"></canvas>
+
+  <main class="gate">
+    <div class="gate-inner rise-in">
+      <div class="mark">
+        <span class="lamp"></span>
+        ZeroTo10
+        <span class="pill">preview</span>
+      </div>
+
+      <h1 class="gate-title">Welcome back to <em>ZeroTo10</em>.</h1>
+      <p class="gate-lede">
+        Sign in and Allya picks up where you left off — the work in flight, the
+        decisions waiting on you, the whole company map.
+      </p>
+
+      <form class="gate-form" id="loginForm" novalidate>
+        <div class="gate-stack">
+          <div class="field">
+            <input type="email" id="email" name="email" inputmode="email"
+                   autocomplete="email" required placeholder="you@example.com" aria-label="Email" />
+          </div>
+          <div class="field">
+            <input type="password" id="password" name="password"
+                   autocomplete="current-password" required placeholder="Password" aria-label="Password" />
+          </div>
+        </div>
+
+        <button class="gate-submit" type="submit" id="submitBtn">
+          Log in
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 12h15M13 6l6 6-6 6" stroke="currentColor" stroke-width="2.2"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </form>
+
+      <div class="gate-note" id="note" role="status" aria-live="polite"></div>
+
+      <p class="gate-foot">
+        We&rsquo;re currently rolling out ZeroTo10.ai to selected users.<br />
+        If you&rsquo;d like an account, please apply on
+        <a href="https://www.linkedin.com/in/sanshat-bhatia" target="_blank" rel="noopener noreferrer">this link</a>.
+      </p>
+    </div>
+  </main>
+
+  <script src="login.js"></script>
+</body>
+</html>

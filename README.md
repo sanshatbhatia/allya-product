@@ -23,6 +23,7 @@ Try: click **Review →** in the work panel, drag the panel by its grabber (flic
 - `index.html` — workspace skeleton (topbar, chat pane, work panel, approval sheet)
 - `styles.css` — design tokens + layout (dark palette, reduced-motion/transparency/contrast fallbacks)
 - `app.js` — Spring engine, scripted conversation flows, data-driven work panel
+- `login.html` / `login.css` / `login.js` — the sign-in gate (`/login`): the company brain drifting behind a dark well, with the form in the quiet middle. No auth service yet — the integration point is marked in `login.js`.
 - `server.mjs` — tiny static server
 
 Prototype only — no backend; conversations are scripted beats.

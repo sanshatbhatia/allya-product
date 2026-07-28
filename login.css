@@ -1,0 +1,145 @@
+/* ============================================================
+   Login — the sign-in gate.
+
+   Tokens, .lamp, .pill and .spinner come from styles.css; this file
+   only adds what the gate itself needs: the full-bleed brain, the
+   dark well punched through it, and the two-field form that sits in
+   the quiet middle.
+
+   The workspace composer owns `.composer .field`, so the gate carries
+   its own `.field` — same shape, no composer chrome. And where the ask
+   gate takes one email and can use a one-tap arrow, signing in is a
+   commitment: two fields make an inline arrow ambiguous, so this uses
+   a labelled full-width action instead.
+   ============================================================ */
+
+.login-body {
+  margin: 0;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+
+/* the brain, thinking behind everything */
+#brain { position: fixed; inset: 0; z-index: 0; display: block; }
+
+/* ============================================================
+   The gate
+   ============================================================ */
+.gate {
+  position: relative; z-index: 1;
+  flex: 1; min-height: 0;
+  display: grid; place-items: center;
+  padding: 32px 24px;
+  pointer-events: none;            /* the brain behind stays touchable */
+}
+/* a well sunk into the middle of the graph — the type sits in the dark,
+   the brain keeps thinking around the edges */
+.gate::before {
+  content: '';
+  position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: radial-gradient(
+    62% 46% at 50% 50%,
+    rgba(10, 10, 10, 0.97) 0%,
+    rgba(10, 10, 10, 0.93) 42%,
+    rgba(10, 10, 10, 0.6) 72%,
+    rgba(10, 10, 10, 0) 100%
+  );
+}
+.gate-inner {
+  position: relative; z-index: 1;
+  pointer-events: auto;
+  width: 100%; max-width: 520px;
+  text-align: center;
+}
+
+.gate .mark {
+  display: inline-flex; align-items: center; gap: 9px;
+  font-size: 15px; font-weight: 500; letter-spacing: -0.01em;
+  color: var(--fg);
+  margin-bottom: 26px;
+}
+/* the workspace lamp is steady in the topbar; here it is the only living
+   thing on the page, so it breathes */
+.gate .lamp { flex: none; animation: pulse 2.4s var(--ease) infinite; }
+.gate .pill {
+  font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 3px 8px;
+}
+
+.gate-title {
+  font-family: var(--serif); font-optical-sizing: auto;
+  font-weight: 460; font-size: clamp(30px, 6.4vw, 46px);
+  line-height: 1.1; letter-spacing: -0.02em;
+  margin: 0 0 14px;
+}
+.gate-title em { font-style: italic; color: var(--lime-glow); }
+
+.gate-lede {
+  font-size: 14.5px; line-height: 1.6; color: var(--fg-soft);
+  margin: 0 auto 28px; max-width: 42ch;
+}
+
+.gate-form { margin: 0 auto; max-width: 400px; text-align: left; }
+/* two fields stacked — the ask gate takes one, sign-in takes two */
+.gate-stack { display: grid; gap: 10px; }
+
+.gate .field {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 12px;
+  padding: 5px 14px;
+  transition: border-color var(--dur) var(--ease);
+}
+.gate .field:focus-within { border-color: var(--lime); }
+.gate .field input {
+  flex: 1; min-width: 0;
+  border: none; outline: none; background: transparent;
+  font-family: var(--sans); font-size: 14.5px; color: var(--fg);
+  padding: 10px 0; line-height: 1.45;
+}
+.gate .field input::placeholder { color: var(--fg-faint); }
+.gate .field input:disabled { opacity: 0.5; }
+
+.gate-submit {
+  width: 100%; margin-top: 12px;
+  appearance: none; border: none; cursor: pointer;
+  background: var(--lime); color: var(--on-lime);
+  border-radius: 12px; padding: 13px 18px;
+  font-family: var(--sans); font-size: 14.5px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  transition: background var(--dur) var(--ease), opacity var(--dur) var(--ease),
+              transform var(--dur) var(--ease);
+  will-change: transform; touch-action: manipulation;
+}
+.gate-submit:hover:not(:disabled) { background: var(--lime-glow); }
+.gate-submit:active:not(:disabled) { transform: scale(0.985); }
+.gate-submit:disabled { opacity: 0.45; cursor: default; }
+.gate-submit svg { width: 16px; height: 16px; }
+
+.gate-note {
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+  min-height: 34px; margin-top: 14px;
+  font-size: 13px; color: var(--fg-soft);
+}
+.gate-note .spinner { width: 13px; height: 13px; }
+.gate-note .is-error { color: var(--danger); }
+
+.gate-foot {
+  margin: 22px 0 0;
+  font-size: 12px; color: var(--fg-faint); letter-spacing: 0.01em;
+  line-height: 1.6;
+}
+.gate-foot a { color: var(--fg-soft); text-decoration: underline; text-underline-offset: 2px; }
+.gate-foot a:hover { color: var(--lime-glow); }
+
+.rise-in { animation: rise-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise-in { animation: none; }
+  .gate .lamp { animation: none; }
+}

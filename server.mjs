@@ -19,6 +19,8 @@ createServer(async (req, res) => {
   try {
     let path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
     if (path === '/') path = '/index.html';
+    // pretty URLs: /login serves login.html, so the gate has a real address
+    else if (!extname(path)) path += '.html';
     const file = join(root, normalize(path).replace(/^(\.\.[/\\])+/, ''));
     const body = await readFile(file);
     res.writeHead(200, { 'Content-Type': TYPES[extname(file)] || 'application/octet-stream' });
